@@ -22,7 +22,8 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   HeadphonesIcon,
-  CheckIcon
+  CheckIcon,
+  ScreenRotateIcon
 } from "./Icons";
 
 export interface AudioTrackItem {
@@ -98,6 +99,9 @@ export default function VideoPlayer({
   const [audioTracks, setAudioTracks] = useState<AudioTrackItem[]>([]);
   const [selectedAudioTrackId, setSelectedAudioTrackId] = useState<string>("0");
   const [showAudioMenu, setShowAudioMenu] = useState(false);
+
+  // More Actions Drawer (Collapsible via Arrow)
+  const [showMoreActions, setShowMoreActions] = useState(false);
 
   // Series Drawer
   const [showEpisodeDrawer, setShowEpisodeDrawer] = useState(false);
@@ -403,15 +407,88 @@ export default function VideoPlayer({
     triggerHud(nextMuted ? "Muted" : `Volume: ${Math.round(volume * 100)}%`);
   }, [isMuted, volume]);
 
-  const toggleFullscreen = useCallback(() => {
-    if (!containerRef.current) return;
-    if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen().catch(() => {});
-      setIsFullscreen(true);
+  const toggleFullscreen = useCallback(async () => {
+    const container = containerRef.current;
+    const video = videoRef.current;
+    if (!container) return;
+
+    const isCurrentlyFullscreen = !!(
+      document.fullscreenElement ||
+      (document as any).webkitFullscreenElement ||
+      (document as any).mozFullScreenElement
+    );
+
+    if (!isCurrentlyFullscreen) {
+      try {
+        if (container.requestFullscreen) {
+          await container.requestFullscreen();
+        } else if ((container as any).webkitRequestFullscreen) {
+          await (container as any).webkitRequestFullscreen();
+        } else if ((video as any)?.webkitEnterFullscreen) {
+          (video as any).webkitEnterFullscreen();
+        }
+        setIsFullscreen(true);
+
+        if (screen.orientation && (screen.orientation as any).lock) {
+          (screen.orientation as any).lock("landscape").catch(() => {});
+        }
+        triggerHud("Fullscreen Mode");
+      } catch (err) {
+        console.warn("Fullscreen request error:", err);
+      }
     } else {
-      document.exitFullscreen().catch(() => {});
-      setIsFullscreen(false);
+      try {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if ((document as any).webkitExitFullscreen) {
+          await (document as any).webkitExitFullscreen();
+        }
+        setIsFullscreen(false);
+        if (screen.orientation && screen.orientation.unlock) {
+          screen.orientation.unlock();
+        }
+        triggerHud("Exit Fullscreen");
+      } catch (err) {
+        console.warn("Exit fullscreen error:", err);
+      }
     }
+  }, []);
+
+  const toggleRotate = useCallback(() => {
+    try {
+      const isLandscape = window.innerWidth > window.innerHeight;
+      if (screen.orientation && (screen.orientation as any).lock) {
+        if (isLandscape) {
+          (screen.orientation as any).lock("portrait").catch(() => {});
+          triggerHud("Portrait Orientation");
+        } else {
+          (screen.orientation as any).lock("landscape").catch(() => {});
+          triggerHud("Landscape Orientation");
+        }
+      } else {
+        toggleFullscreen();
+      }
+    } catch {
+      toggleFullscreen();
+    }
+  }, [toggleFullscreen]);
+
+  // Sync fullscreen state changes from browser/device gestures
+  useEffect(() => {
+    const handleFsChange = () => {
+      const isFs = !!(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement
+      );
+      setIsFullscreen(isFs);
+    };
+    document.addEventListener("fullscreenchange", handleFsChange);
+    document.addEventListener("webkitfullscreenchange", handleFsChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFsChange);
+      document.removeEventListener("webkitfullscreenchange", handleFsChange);
+    };
   }, []);
 
   // Keyboard controls listener (strictly satisfies user prompt: arrow up/down volume, left/right skip 5s)
@@ -445,6 +522,11 @@ export default function VideoPlayer({
         case "F":
           e.preventDefault();
           toggleFullscreen();
+          break;
+        case "r":
+        case "R":
+          e.preventDefault();
+          toggleRotate();
           break;
         case "m":
         case "M":
@@ -698,75 +780,71 @@ export default function VideoPlayer({
           </div>
         </div>
 
-        {/* Quick Top Actions: External Players, URL, Download */}
-        <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-          {isSeries && (
-            <button
-              onClick={() => setShowEpisodeDrawer(!showEpisodeDrawer)}
-              className="px-2 sm:px-3 py-1 sm:py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-xs sm:text-sm rounded-lg flex items-center space-x-1 border border-zinc-700 transition"
-            >
-              <span>Episodes</span>
-              <ChevronDownIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            </button>
-          )}
+        {/* Top Actions: Rotate, Quick Actions, and Collapsible Arrow */}
+        <div className="flex items-center space-x-1.5 sm:space-x-2 flex-shrink-0">
+          {/* Direct Screen Rotate button */}
+          <button
+            onClick={toggleRotate}
+            className="p-1.5 sm:p-2 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 rounded-xl transition flex items-center space-x-1 border border-zinc-700/60"
+            title="Rotate Screen (Portrait / Landscape)"
+          >
+            <ScreenRotateIcon className="w-4 h-4 text-emerald-400" />
+            <span className="hidden sm:inline text-xs font-medium">Rotate</span>
+          </button>
 
-          {/* 1-Click Launch in VLC / PotPlayer via .m3u Stream File */}
+          {/* Quick VLC button on Desktop */}
           <button
             onClick={() => {
               launchExternalStream(streamUrl, title);
               triggerHud("Stream file ready! Click to open in VLC or PotPlayer");
             }}
-            className="flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold rounded-xl transition shadow-md shadow-orange-600/30"
+            className="hidden md:flex items-center space-x-1.5 px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold rounded-xl transition shadow-md shadow-orange-600/30"
             title="Stream in VLC or PotPlayer directly"
           >
             <ExternalLinkIcon className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Open in VLC</span>
-            <span className="sm:hidden text-[11px]">VLC</span>
+            <span>Open in VLC</span>
           </button>
 
+          {/* Collapsible Arrow Menu Button */}
           <button
-            onClick={copyDirectUrl}
-            className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full text-zinc-300 hover:text-white transition"
-            title="Copy Direct Stream URL"
+            onClick={() => setShowMoreActions(!showMoreActions)}
+            className={`px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-xl border transition flex items-center space-x-1 text-xs font-semibold ${
+              showMoreActions
+                ? "bg-red-600 text-white border-red-500 shadow-lg shadow-red-600/30"
+                : "bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 border-zinc-700/60"
+            }`}
+            title="Toggle Extra Actions & Settings"
           >
-            <CopyIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="text-xs">Options</span>
+            <ChevronDownIcon
+              className={`w-4 h-4 transform transition-transform duration-200 ${
+                showMoreActions ? "rotate-180" : ""
+              }`}
+            />
           </button>
-
-          <a
-            href={streamUrl}
-            download
-            className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full text-zinc-300 hover:text-white transition"
-            title="Download Video File"
-          >
-            <DownloadIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-          </a>
         </div>
       </div>
 
       {/* Bottom Controls Bar */}
       <div
-        className={`absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-black/95 via-black/70 to-transparent flex flex-col space-y-3 transition-opacity duration-300 ${
+        className={`absolute bottom-0 left-0 right-0 p-3 sm:p-4 md:p-6 bg-gradient-to-t from-black/95 via-black/70 to-transparent flex flex-col space-y-2 sm:space-y-3 transition-opacity duration-300 z-30 ${
           showControls ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       >
         {/* Timeline Slider with Progressive Buffering Display */}
-        <div className="relative w-full group py-1 cursor-pointer">
-          {/* Background Bar */}
-          <div className="relative w-full h-1.5 group-hover:h-2.5 bg-zinc-800 rounded-full overflow-hidden transition-all">
-            {/* Buffer Progress (Gray) */}
+        <div className="relative w-full group py-2 sm:py-1 cursor-pointer -my-1 sm:my-0">
+          <div className="relative w-full h-1.5 sm:group-hover:h-2.5 bg-zinc-800 rounded-full overflow-hidden transition-all">
             <div
               className="absolute top-0 left-0 h-full bg-zinc-600/60 rounded-full transition-all duration-300"
               style={{ width: `${bufferPercent}%` }}
               title={`Buffered: ${Math.round(bufferPercent)}%`}
             />
-            {/* Playback Progress (Red) */}
             <div
               className="absolute top-0 left-0 h-full bg-red-600 rounded-full transition-all"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
 
-          {/* Interactive Range Input */}
           <input
             type="range"
             min={0}
@@ -780,14 +858,18 @@ export default function VideoPlayer({
 
         {/* Action Buttons Row */}
         <div className="flex items-center justify-between text-white">
-          {/* Left Controls: Play, Skips, Volume, Timers */}
+          {/* Left Controls: Play, Skips, Mute, Timers */}
           <div className="flex items-center space-x-1.5 sm:space-x-3 md:space-x-4">
             <button
               onClick={handleVideoClick}
               className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full text-white transition transform active:scale-95"
               title={isPlaying ? "Pause (Space)" : "Play (Space)"}
             >
-              {isPlaying ? <PauseIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7" /> : <PlayIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7" />}
+              {isPlaying ? (
+                <PauseIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7" />
+              ) : (
+                <PlayIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7" />
+              )}
             </button>
 
             {/* Skip 5s Backwards & Forwards */}
@@ -807,7 +889,7 @@ export default function VideoPlayer({
               <SkipForward5Icon className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
             </button>
 
-            {/* Volume Control (Slider hidden on phones, physical phone buttons used) */}
+            {/* Volume Control */}
             <div className="flex items-center space-x-1 sm:space-x-2 group">
               <button
                 onClick={toggleMute}
@@ -844,238 +926,16 @@ export default function VideoPlayer({
             </div>
           </div>
 
-          {/* Right Controls: Subtitles, Volume Boost, Speed, Fullscreen */}
-          <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-3">
-            {/* Direct VLC / PotPlayer Stream for Dolby / DTS */}
+          {/* Right Controls: Rotate, Fullscreen, and Arrow Options */}
+          <div className="flex items-center space-x-1 sm:space-x-2">
+            {/* Screen Rotate button */}
             <button
-              onClick={() => {
-                launchExternalStream(streamUrl, title);
-                triggerHud("Stream file ready! Click to open in VLC/PotPlayer");
-              }}
-              className="hidden md:flex items-center space-x-1 px-2.5 py-1.5 bg-orange-600/90 hover:bg-orange-600 text-white text-xs font-semibold rounded-lg transition"
-              title="Stream in VLC or PotPlayer directly (Supports 5.1/7.1 Dolby AC3 & DTS)"
+              onClick={toggleRotate}
+              className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full text-zinc-300 hover:text-white transition"
+              title="Rotate Screen (Landscape / Portrait)"
             >
-              <span>VLC / PotPlayer (.m3u)</span>
+              <ScreenRotateIcon className="w-5 h-5 text-emerald-400" />
             </button>
-
-            {/* Playback Rate Dropdown */}
-            <select
-              value={playbackRate}
-              onChange={(e) => {
-                const rate = parseFloat(e.target.value);
-                setPlaybackRate(rate);
-                if (videoRef.current) videoRef.current.playbackRate = rate;
-              }}
-              className="bg-zinc-800/90 text-[10px] sm:text-xs text-zinc-300 px-1 sm:px-2 py-1 rounded-md sm:rounded-lg border border-zinc-700 cursor-pointer focus:outline-none"
-              title="Playback Speed"
-            >
-              <option value={0.5}>0.5x</option>
-              <option value={0.75}>0.75x</option>
-              <option value={1}>1.0x</option>
-              <option value={1.25}>1.25x</option>
-              <option value={1.5}>1.5x</option>
-              <option value={2}>2.0x</option>
-            </select>
-
-            {/* Subtitle Toggle & Menu (Tap-friendly on Mobile) */}
-            <div className="relative group">
-              <button
-                onClick={() => {
-                  setShowSubtitlesMenu(!showSubtitlesMenu);
-                  setShowAudioMenu(false);
-                }}
-                className={`p-1.5 sm:p-2 rounded-full transition ${
-                  showSubtitles ? "text-red-500 bg-red-500/20" : "text-zinc-400 hover:text-white hover:bg-white/10"
-                }`}
-                title="Toggle Subtitle (C)"
-              >
-                <SubtitlesIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-              </button>
-
-              {/* Subtitle Settings Popover */}
-              <div
-                className={`absolute bottom-full right-0 mb-2 w-72 max-w-[calc(100vw-24px)] bg-zinc-900/95 border border-zinc-800 rounded-xl p-3 text-xs shadow-2xl backdrop-blur-md flex-col space-y-2 pointer-events-auto z-50 ${
-                  showSubtitlesMenu ? "flex" : "hidden sm:group-hover:flex"
-                }`}
-              >
-                <div className="flex items-center justify-between pb-1 border-b border-zinc-800">
-                  <div className="flex items-center space-x-1.5">
-                    <SubtitlesIcon className="w-4 h-4 text-red-500" />
-                    <span className="font-semibold text-white">Subtitle Settings</span>
-                  </div>
-                  <button
-                    onClick={() => setShowSubtitlesMenu(false)}
-                    className="p-1 text-zinc-400 hover:text-white rounded"
-                  >
-                    <CloseIcon className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                {/* Quick Toggle On/Off */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowSubtitles(!showSubtitles);
-                    triggerHud(!showSubtitles ? "Subtitles: ON" : "Subtitles: OFF");
-                  }}
-                  className={`w-full py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 transition ${
-                    showSubtitles ? "bg-red-600 text-white" : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
-                  }`}
-                >
-                  <span>{showSubtitles ? "Subtitles Enabled (Click to Turn Off)" : "Turn Subtitles On"}</span>
-                </button>
-
-                {/* Online Subtitle Finder Trigger */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowSubtitlesMenu(false);
-                    setShowOnlineSubtitleModal(true);
-                  }}
-                  className="w-full py-1.5 px-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 transition shadow-md shadow-red-600/30"
-                >
-                  <SearchIcon className="w-3.5 h-3.5" />
-                  <span>Find Online Subtitles (Auto-Save)</span>
-                </button>
-
-                {/* Upload Local SRT */}
-                <div>
-                  <label className="block text-zinc-400 mb-1">Load Custom Subtitle (.srt / .vtt):</label>
-                  <input
-                    type="file"
-                    accept=".srt,.vtt"
-                    onChange={handleCustomSubtitleUpload}
-                    className="w-full text-[11px] text-zinc-400 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[11px] file:bg-zinc-800 file:text-zinc-200 hover:file:bg-zinc-700"
-                  />
-                </div>
-
-                {/* Subtitle Font Size */}
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-zinc-400">Font Size:</span>
-                  <div className="flex space-x-1">
-                    {(["sm", "md", "lg", "xl"] as const).map((sz) => (
-                      <button
-                        key={sz}
-                        onClick={() => setSubtitleSize(sz)}
-                        className={`px-1.5 py-0.5 rounded uppercase font-bold text-[10px] ${
-                          subtitleSize === sz ? "bg-red-600 text-white" : "bg-zinc-800 text-zinc-400"
-                        }`}
-                      >
-                        {sz}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Subtitle Sync Offset */}
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-zinc-400">Sync Delay:</span>
-                  <div className="flex items-center space-x-1">
-                    <button
-                      onClick={() => setSubDelay((d) => d - 0.5)}
-                      className="px-1.5 py-0.5 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-200"
-                    >
-                      -0.5s
-                    </button>
-                    <span className="text-white w-8 text-center">{subDelay.toFixed(1)}s</span>
-                    <button
-                      onClick={() => setSubDelay((d) => d + 0.5)}
-                      className="px-1.5 py-0.5 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-200"
-                    >
-                      +0.5s
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Audio Track / Dubbing Switcher (Tap-friendly on Mobile) */}
-            <div className="relative group">
-              <button
-                onClick={() => {
-                  setShowAudioMenu(!showAudioMenu);
-                  setShowSubtitlesMenu(false);
-                }}
-                className={`p-1.5 sm:p-2 rounded-full transition flex items-center space-x-1 ${
-                  audioTracks.length > 1
-                    ? "text-red-400 bg-red-500/10 hover:bg-red-500/20"
-                    : "text-zinc-400 hover:text-white hover:bg-white/10"
-                }`}
-                title="Audio Tracks & Dubbing (Shortcut: B / A)"
-              >
-                <HeadphonesIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                {audioTracks.length > 1 && (
-                  <span className="text-[10px] font-bold bg-red-600 text-white rounded-full px-1.5 py-0.2">
-                    {audioTracks.length}
-                  </span>
-                )}
-              </button>
-
-              {/* Audio Settings Popover */}
-              <div
-                className={`absolute bottom-full right-0 mb-2 w-72 max-w-[calc(100vw-24px)] bg-zinc-900/95 border border-zinc-800 rounded-xl p-3 text-xs shadow-2xl backdrop-blur-md flex-col space-y-2.5 pointer-events-auto z-50 ${
-                  showAudioMenu ? "flex" : "hidden sm:group-hover:flex"
-                }`}
-              >
-                <div className="flex items-center justify-between pb-1.5 border-b border-zinc-800">
-                  <div className="flex items-center space-x-1.5">
-                    <HeadphonesIcon className="w-4 h-4 text-red-500" />
-                    <span className="font-semibold text-white">Audio & Dubbing</span>
-                  </div>
-                  <button
-                    onClick={() => setShowAudioMenu(false)}
-                    className="p-1 text-zinc-400 hover:text-white rounded"
-                  >
-                    <CloseIcon className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                {/* Track Selection List */}
-                <div className="space-y-1">
-                  <span className="text-[11px] text-zinc-400 font-medium">Select Audio Track:</span>
-                  {audioTracks.map((track) => {
-                    const isSelected = track.id === selectedAudioTrackId;
-                    return (
-                      <button
-                        key={track.id}
-                        onClick={() => {
-                          switchAudioTrack(track.id);
-                          setShowAudioMenu(false);
-                        }}
-                        className={`w-full text-left p-2 rounded-lg flex items-center justify-between transition ${
-                          isSelected
-                            ? "bg-red-600/20 border border-red-500/60 text-white font-medium"
-                            : "bg-zinc-800/60 hover:bg-zinc-800 text-zinc-300 border border-transparent"
-                        }`}
-                      >
-                        <div className="flex items-center space-x-2 truncate">
-                          <span className={`w-2 h-2 rounded-full ${isSelected ? "bg-red-500" : "bg-zinc-600"}`} />
-                          <span className="truncate text-xs">{track.label}</span>
-                        </div>
-                        {isSelected && <CheckIcon className="w-4 h-4 text-red-400 flex-shrink-0" />}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* PotPlayer / VLC Audio Demux helper */}
-                <div className="pt-1.5 border-t border-zinc-800">
-                  <div className="text-[11px] text-zinc-400 mb-2 leading-relaxed">
-                    💡 <span className="text-zinc-300">Dual Audio / Dolby 5.1:</span> If browser defaults to 1 audio stream on this file, switch tracks instantly via VLC or PotPlayer.
-                  </div>
-                  <button
-                    onClick={() => {
-                      launchExternalStream(streamUrl, title);
-                      triggerHud("Stream file ready! Press 'B' in VLC to cycle audio tracks");
-                    }}
-                    className="w-full py-1.5 px-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 transition shadow-md shadow-orange-600/30"
-                  >
-                    <ExternalLinkIcon className="w-3.5 h-3.5" />
-                    <span>Switch in VLC / PotPlayer (Press 'B')</span>
-                  </button>
-                </div>
-              </div>
-            </div>
 
             {/* Fullscreen Button */}
             <button
@@ -1084,14 +944,248 @@ export default function VideoPlayer({
               title="Fullscreen (F)"
             >
               {isFullscreen ? (
-                <ExitFullscreenIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                <ExitFullscreenIcon className="w-5 h-5 sm:w-6 sm:h-6 text-red-400" />
               ) : (
                 <FullscreenIcon className="w-5 h-5 sm:w-6 sm:h-6" />
               )}
             </button>
+
+            {/* Arrow Button to expand More Actions */}
+            <button
+              onClick={() => setShowMoreActions(!showMoreActions)}
+              className={`p-1.5 sm:px-2.5 sm:py-1 rounded-lg border transition flex items-center space-x-1 text-xs font-semibold ${
+                showMoreActions
+                  ? "bg-red-600 text-white border-red-500"
+                  : "bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 border-zinc-700/60"
+              }`}
+              title="More Actions (Subtitles, Dubbing, VLC, Speed)"
+            >
+              <ChevronDownIcon
+                className={`w-4 h-4 transform transition-transform duration-200 ${
+                  showMoreActions ? "rotate-180" : ""
+                }`}
+              />
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Collapsible More Actions Sheet (Hidden with Arrow) */}
+      {showMoreActions && (
+        <div className="absolute inset-x-0 bottom-0 sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 z-50 w-full sm:w-[480px] max-w-full bg-zinc-950/95 sm:rounded-2xl border-t sm:border border-zinc-800 p-4 sm:p-5 shadow-2xl backdrop-blur-2xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-200">
+          {/* Header */}
+          <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80 mb-3">
+            <div className="flex items-center space-x-2">
+              <span className="font-bold text-white text-sm">Player Options & Actions</span>
+              <span className="text-[10px] bg-red-600/30 text-red-400 px-2 py-0.5 rounded-full font-semibold">BDIX</span>
+            </div>
+            <button
+              onClick={() => setShowMoreActions(false)}
+              className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800"
+              title="Close options"
+            >
+              <CloseIcon className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="space-y-3.5">
+            {/* Quick Actions Row */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => {
+                  launchExternalStream(streamUrl, title);
+                  triggerHud("Stream file ready! Click to open in VLC or PotPlayer");
+                  setShowMoreActions(false);
+                }}
+                className="p-3 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-2 transition shadow-md shadow-orange-600/30"
+              >
+                <ExternalLinkIcon className="w-4 h-4" />
+                <span>Open in VLC / PotPlayer</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  toggleRotate();
+                  setShowMoreActions(false);
+                }}
+                className="p-3 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-800 rounded-xl text-xs font-semibold flex items-center justify-center space-x-2 transition"
+              >
+                <ScreenRotateIcon className="w-4 h-4 text-emerald-400" />
+                <span>Rotate Screen</span>
+              </button>
+            </div>
+
+            {/* Audio Track / Dubbing Selector */}
+            <div className="p-3 bg-zinc-900/80 border border-zinc-800/80 rounded-xl">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-white flex items-center space-x-1.5">
+                  <HeadphonesIcon className="w-4 h-4 text-red-500" />
+                  <span>Audio & Dubbing</span>
+                </span>
+                <span className="text-[10px] text-zinc-500 font-mono">Hotkeys: 'B' / 'A'</span>
+              </div>
+              <div className="space-y-1">
+                {audioTracks.map((track) => {
+                  const isSelected = track.id === selectedAudioTrackId;
+                  return (
+                    <button
+                      key={track.id}
+                      onClick={() => switchAudioTrack(track.id)}
+                      className={`w-full text-left p-2 rounded-lg flex items-center justify-between text-xs transition ${
+                        isSelected
+                          ? "bg-red-600/20 border border-red-500/60 text-white font-medium"
+                          : "bg-zinc-800/50 hover:bg-zinc-800 text-zinc-300 border border-transparent"
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2 truncate">
+                        <span className={`w-2 h-2 rounded-full ${isSelected ? "bg-red-500" : "bg-zinc-600"}`} />
+                        <span className="truncate">{track.label}</span>
+                      </div>
+                      {isSelected && <CheckIcon className="w-4 h-4 text-red-400 flex-shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Subtitles & Online Finder */}
+            <div className="p-3 bg-zinc-900/80 border border-zinc-800/80 rounded-xl space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white flex items-center space-x-1.5">
+                  <SubtitlesIcon className="w-4 h-4 text-red-500" />
+                  <span>Subtitles</span>
+                </span>
+                <button
+                  onClick={() => {
+                    setShowSubtitles(!showSubtitles);
+                    triggerHud(!showSubtitles ? "Subtitles: ON" : "Subtitles: OFF");
+                  }}
+                  className={`px-2.5 py-0.5 rounded text-[11px] font-semibold transition ${
+                    showSubtitles ? "bg-red-600 text-white" : "bg-zinc-800 text-zinc-400"
+                  }`}
+                >
+                  {showSubtitles ? "ON" : "OFF"}
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMoreActions(false);
+                  setShowOnlineSubtitleModal(true);
+                }}
+                className="w-full py-2 px-3 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 transition shadow-md shadow-red-600/20"
+              >
+                <SearchIcon className="w-3.5 h-3.5" />
+                <span>Find Online Subtitles (Auto-Save)</span>
+              </button>
+
+              {/* Upload Local SRT */}
+              <div>
+                <label className="block text-[11px] text-zinc-400 mb-1">Load Custom Subtitle (.srt / .vtt):</label>
+                <input
+                  type="file"
+                  accept=".srt,.vtt"
+                  onChange={handleCustomSubtitleUpload}
+                  className="w-full text-[11px] text-zinc-400 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[11px] file:bg-zinc-800 file:text-zinc-200 hover:file:bg-zinc-700"
+                />
+              </div>
+
+              {/* Subtitle Font Size & Delay */}
+              <div className="flex items-center justify-between pt-1 border-t border-zinc-800 text-xs">
+                <span className="text-zinc-400">Size:</span>
+                <div className="flex space-x-1">
+                  {(["sm", "md", "lg", "xl"] as const).map((sz) => (
+                    <button
+                      key={sz}
+                      onClick={() => setSubtitleSize(sz)}
+                      className={`px-1.5 py-0.5 rounded uppercase font-bold text-[10px] ${
+                        subtitleSize === sz ? "bg-red-600 text-white" : "bg-zinc-800 text-zinc-400"
+                      }`}
+                    >
+                      {sz}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1 text-xs">
+                <span className="text-zinc-400">Delay:</span>
+                <div className="flex items-center space-x-1">
+                  <button
+                    onClick={() => setSubDelay((d) => d - 0.5)}
+                    className="px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-200"
+                  >
+                    -0.5s
+                  </button>
+                  <span className="text-white w-8 text-center">{subDelay.toFixed(1)}s</span>
+                  <button
+                    onClick={() => setSubDelay((d) => d + 0.5)}
+                    className="px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-200"
+                  >
+                    +0.5s
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Playback Speed */}
+            <div className="p-3 bg-zinc-900/80 border border-zinc-800/80 rounded-xl flex items-center justify-between text-xs">
+              <span className="font-bold text-white">Playback Speed</span>
+              <div className="flex space-x-1">
+                {[0.5, 0.75, 1, 1.25, 1.5, 2].map((rate) => (
+                  <button
+                    key={rate}
+                    onClick={() => {
+                      setPlaybackRate(rate);
+                      if (videoRef.current) videoRef.current.playbackRate = rate;
+                      triggerHud(`${rate}x Speed`);
+                    }}
+                    className={`px-2 py-1 rounded text-xs font-semibold ${
+                      playbackRate === rate ? "bg-red-600 text-white" : "bg-zinc-800 text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    {rate}x
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Secondary Actions: Series Episodes, Copy URL, Download */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+              {isSeries && (
+                <button
+                  onClick={() => {
+                    setShowMoreActions(false);
+                    setShowEpisodeDrawer(true);
+                  }}
+                  className="p-2.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-800 rounded-xl font-semibold flex items-center justify-center space-x-1.5 transition"
+                >
+                  <span>📺 Episodes</span>
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  copyDirectUrl();
+                  setShowMoreActions(false);
+                }}
+                className="p-2.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-800 rounded-xl font-semibold flex items-center justify-center space-x-1.5 transition"
+              >
+                <CopyIcon className="w-3.5 h-3.5" />
+                <span>Copy URL</span>
+              </button>
+              <a
+                href={streamUrl}
+                download
+                className="p-2.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-800 rounded-xl font-semibold flex items-center justify-center space-x-1.5 transition"
+              >
+                <DownloadIcon className="w-3.5 h-3.5" />
+                <span>Download</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Series Episode Selector Drawer */}
       {isSeries && showEpisodeDrawer && (
