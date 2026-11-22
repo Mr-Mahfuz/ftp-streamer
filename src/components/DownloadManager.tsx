@@ -10,7 +10,7 @@ export interface DownloadTarget {
   name: string;
   url: string;
   size?: string;
-  type: "movie" | "episode";
+  type: "movie" | "episode" | "software" | "game";
 }
 
 interface DownloadManagerProps {

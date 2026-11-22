@@ -9,12 +9,13 @@ import {
   FolderTreeIcon,
   DownloadIcon,
   ChevronDownIcon,
-  SparklesIcon
+  SparklesIcon,
+  GamepadIcon
 } from "./Icons";
 
 interface NavbarProps {
-  activeTab: "library" | "tree";
-  setActiveTab: (tab: "library" | "tree") => void;
+  activeTab: "library" | "games-software" | "tree";
+  setActiveTab: (tab: "library" | "games-software" | "tree") => void;
   selectedCategory: string | null;
   onSelectCategory: (catId: string | null) => void;
   searchQuery: string;
@@ -161,6 +162,25 @@ export default function Navbar({
                   </div>
                 )}
               </div>
+
+              {/* Games & Software Multiple File Downloader Tab */}
+              <button
+                onClick={() => {
+                  onSelectCategory(null);
+                  setActiveTab("games-software");
+                }}
+                className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition ${
+                  activeTab === "games-software"
+                    ? "bg-cyan-600 text-white shadow-md shadow-cyan-600/30"
+                    : "text-zinc-400 hover:text-white hover:bg-zinc-900"
+                }`}
+              >
+                <GamepadIcon className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Games & Software</span>
+                <span className="hidden lg:inline bg-cyan-950/80 text-cyan-300 border border-cyan-700/60 text-[9px] px-1 py-0.2 rounded font-mono font-bold">
+                  Downloader
+                </span>
+              </button>
 
               {/* Tree Explorer View Tab */}
               <button

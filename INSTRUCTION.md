@@ -150,7 +150,28 @@ The comprehensive crawler (`scripts/crawl_comprehensive.py`) systematically trav
 
 ---
 
-## ⚡ 8. Performance & Pagination
+## 🎮 9. Games & Software Download Hub (`http://172.16.50.8/`)
+
+DhakaFlix hosts its gaming, software, and tools library on `http://172.16.50.8/DHAKA-FLIX-8/`. Unlike movies and TV series, these are direct installation packages (ISOs, EXEs, ZIPs, RARs, APKs).
+
+### Categories Covered (2,022 indexed packages):
+* **PC Games** (`172.16.50.8/DHAKA-FLIX-8/PC Games/`): 1,358 PC games across all letter partitions (`0-9`, `A-D`, `E-K`, `L-R`, `S-Z`).
+* **Console Games** (`172.16.50.8/DHAKA-FLIX-8/Console Games/`): 412 titles across PS4, PS3, PSP, XBOX 360, and Nintendo Switch.
+* **Android Games** (`172.16.50.8/DHAKA-FLIX-8/Android Games/`): 150 mobile games (APKs, OBB caches, and mods).
+* **Software & Tools** (`172.16.50.8/DHAKA-FLIX-8/Software/`): 102 software packages (Adobe Master Collection for Windows/macOS, CAD tools, Android Studio, Emulators, Antivirus, audio suites).
+
+### Multiple File Downloader Workflow:
+1. Switch to the **"Games & Software"** tab in the top navigation bar.
+2. Filter by platform or use the real-time search (e.g. `GTA`, `Adobe`, `Assassin's Creed`, `FIFA`).
+3. **Single File Download**: Click **Get** to trigger an instant browser download.
+4. **Inspect Multi-part Archives**: Click **Files** to open `GamesSoftwareModal` and select specific `.part1.rar`, `setup.exe`, or all files.
+5. **Batch Downloader**: Check **Select Batch** on desired items. The floating **Download Manager** allows:
+   * **Download All**: High-speed sequential browser download.
+   * **Export IDM File**: Generates an Internet Download Manager batch text file (`idm_download_links.txt`) for 1-click import into IDM.
+
+---
+
+## ⚡ 10. Performance & Pagination
 
 * The main library is paginated using `paginatedItems` in `src/App.tsx`.
 * Default: **30 items per page** (selectable: 24, 36, 48, 96).
@@ -159,7 +180,7 @@ The comprehensive crawler (`scripts/crawl_comprehensive.py`) systematically trav
 
 ---
 
-## ☁️ 9. Deploying to Vercel
+## ☁️ 11. Deploying to Vercel
 
 The project includes `vercel.json` pre-configured with Vite client routing:
 ```json
@@ -198,15 +219,20 @@ The project includes `vercel.json` pre-configured with Vite client routing:
 dhakaflix-stream/
 ├── public/
 │   └── data/
-│       └── catalog.json            # Static database of all crawled media
+│       ├── catalog.json            # Static database of 4,632 movies & series
+│       └── games_software.json     # Static database of 2,022 games & software
 ├── scripts/
 │   ├── crawl.py                    # Main crawler script
+│   ├── crawl_comprehensive.py      # Traverses all letter buckets & years
+│   ├── index_all_games.py          # Crawls 2,000+ PC/Console games & software
 │   ├── crawler_core.py             # Folder inspector & metadata parser
 │   └── crawler_base.py             # Server IP list and category configurations
 ├── src/
 │   ├── components/
 │   │   ├── VideoPlayer.tsx         # Player with buffer progress & keyboard events
 │   │   ├── SubtitleFinderModal.tsx # Online subtitle finder & localStorage cache
+│   │   ├── GamesSoftwareView.tsx   # Games & Software multiple file download view
+│   │   ├── GamesSoftwareModal.tsx  # Multi-part file inspector & folder downloader
 │   │   ├── MediaCard.tsx           # Movie/series card with stream & select actions
 │   │   ├── SeriesModal.tsx         # Season/episode viewer & season batch download
 │   │   ├── DownloadManager.tsx     # Floating download cart, IDM & M3U exporter

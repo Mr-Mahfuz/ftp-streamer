@@ -55,3 +55,22 @@ export interface PlaybackState {
   duration: number;
   lastUpdated: number;
 }
+
+export interface GameSoftwareFile {
+  name: string;
+  url: string;
+  size: string;
+}
+
+export interface GameSoftwareItem {
+  id: string;
+  title: string;
+  category_id: "pc-games" | "console-games" | "android-games" | "software" | string;
+  category_name: string;
+  platform: "PC" | "PS4" | "PS3" | "XBOX" | "Switch" | "Android" | "macOS" | "Windows" | string;
+  size: string;
+  folder_url: string;
+  download_url: string;
+  file_count: number;
+  files?: GameSoftwareFile[];
+}

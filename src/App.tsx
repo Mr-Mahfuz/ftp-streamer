@@ -7,6 +7,7 @@ import Navbar from "./components/Navbar";
 import HeroBanner from "./components/HeroBanner";
 import MediaCard from "./components/MediaCard";
 import TreeExplorer from "./components/TreeExplorer";
+import GamesSoftwareView from "./components/GamesSoftwareView";
 import VideoPlayer from "./components/VideoPlayer";
 import SeriesModal from "./components/SeriesModal";
 import DownloadManager, { DownloadTarget } from "./components/DownloadManager";
@@ -27,7 +28,7 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedMenu, setSelectedMenu] = useState<"all" | "movies" | "tv-series">("all");
-  const [activeTab, setActiveTab] = useState<"library" | "tree">("library");
+  const [activeTab, setActiveTab] = useState<"library" | "games-software" | "tree">("library");
 
   // Pagination State for high performance
   const [currentPage, setCurrentPage] = useState(1);
@@ -241,6 +242,12 @@ export default function Home() {
             catalog={catalog}
             onPlay={handlePlay}
             onToggleSelect={toggleSelectMediaCard}
+            selectedIds={selectedIdsSet}
+          />
+        ) : activeTab === "games-software" ? (
+          <GamesSoftwareView
+            onToggleTarget={toggleDownloadTarget}
+            onAddBatchTargets={addBatchTargets}
             selectedIds={selectedIdsSet}
           />
         ) : (
