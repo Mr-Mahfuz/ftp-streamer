@@ -29,6 +29,15 @@ export default function Home() {
   const [selectedMenu, setSelectedMenu] = useState<"all" | "movies" | "tv-series">("all");
   const [activeTab, setActiveTab] = useState<"library" | "tree">("library");
 
+  // Pagination State for high performance
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(30);
+
+  // Reset to first page when search or category filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategory, selectedMenu]);
+
   // Selected items for Batch Download
   const [selectedDownloadTargets, setSelectedDownloadTargets] = useState<DownloadTarget[]>([]);
 
@@ -86,6 +95,13 @@ export default function Home() {
       return true;
     });
   }, [catalog, selectedMenu, selectedCategory, searchQuery]);
+
+  // Paginated items slice for smooth rendering performance
+  const totalPages = Math.ceil(filteredItems.length / itemsPerPage) || 1;
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredItems.slice(start, start + itemsPerPage);
+  }, [filteredItems, currentPage, itemsPerPage]);
 
   // Featured items for Hero Banner (Latest releases with high quality)
   const featuredItems = useMemo(() => {
@@ -343,17 +359,104 @@ export default function Home() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-5">
-                {filteredItems.map((item) => (
-                  <MediaCard
-                    key={item.id}
-                    item={item}
-                    isSelected={selectedIdsSet.has(item.id)}
-                    onToggleSelect={toggleSelectMediaCard}
-                    onPlay={handlePlay}
-                  />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-5">
+                  {paginatedItems.map((item) => (
+                    <MediaCard
+                      key={item.id}
+                      item={item}
+                      isSelected={selectedIdsSet.has(item.id)}
+                      onToggleSelect={toggleSelectMediaCard}
+                      onPlay={handlePlay}
+                    />
+                  ))}
+                </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="mt-8 pt-4 border-t border-zinc-800/80 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="text-xs text-zinc-400">
+                      Showing{" "}
+                      <strong className="text-white">
+                        {(currentPage - 1) * itemsPerPage + 1}
+                      </strong>{" "}
+                      to{" "}
+                      <strong className="text-white">
+                        {Math.min(currentPage * itemsPerPage, filteredItems.length)}
+                      </strong>{" "}
+                      of <strong className="text-white">{filteredItems.length}</strong> items
+                    </div>
+
+                    <div className="flex items-center space-x-1.5">
+                      <button
+                        onClick={() => {
+                          setCurrentPage((p) => Math.max(1, p - 1));
+                          window.scrollTo({ top: 300, behavior: "smooth" });
+                        }}
+                        disabled={currentPage === 1}
+                        className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 text-xs text-zinc-300 font-semibold rounded-xl border border-zinc-800 transition"
+                      >
+                        Previous
+                      </button>
+
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNum = currentPage;
+                        if (totalPages <= 5) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNum = totalPages - 4 + i;
+                        } else {
+                          pageNum = currentPage - 2 + i;
+                        }
+
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => {
+                              setCurrentPage(pageNum);
+                              window.scrollTo({ top: 300, behavior: "smooth" });
+                            }}
+                            className={`w-8 h-8 rounded-xl text-xs font-bold transition ${
+                              currentPage === pageNum
+                                ? "bg-red-600 text-white shadow-md shadow-red-600/30"
+                                : "bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 border border-zinc-800"
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+
+                      <button
+                        onClick={() => {
+                          setCurrentPage((p) => Math.min(totalPages, p + 1));
+                          window.scrollTo({ top: 300, behavior: "smooth" });
+                        }}
+                        disabled={currentPage === totalPages}
+                        className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 text-xs text-zinc-300 font-semibold rounded-xl border border-zinc-800 transition"
+                      >
+                        Next
+                      </button>
+
+                      <select
+                        value={itemsPerPage}
+                        onChange={(e) => {
+                          setItemsPerPage(Number(e.target.value));
+                          setCurrentPage(1);
+                        }}
+                        className="ml-2 bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 px-2 py-1.5 rounded-xl focus:outline-none"
+                      >
+                        <option value={24}>24 / page</option>
+                        <option value={36}>36 / page</option>
+                        <option value={48}>48 / page</option>
+                        <option value={96}>96 / page</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}

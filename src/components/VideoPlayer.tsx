@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
+import SubtitleFinderModal, { ParsedCue } from "./SubtitleFinderModal";
+import { SearchIcon, SparklesIcon } from "./Icons";
 import { MediaItem, Episode, Season } from "../types";
 import {
   PlayIcon,
@@ -72,6 +74,7 @@ export default function VideoPlayer({
 
   // Subtitles
   const [showSubtitles, setShowSubtitles] = useState(false);
+  const [showOnlineSubtitleModal, setShowOnlineSubtitleModal] = useState(false);
   const [subtitleTracks, setSubtitleTracks] = useState<{ label: string; src: string }[]>([]);
   const [selectedSubTrack, setSelectedSubTrack] = useState<string>("");
   const [subtitleSize, setSubtitleSize] = useState<"sm" | "md" | "lg" | "xl">("md");
@@ -93,8 +96,24 @@ export default function VideoPlayer({
     hudTimeoutRef.current = setTimeout(() => setHudMessage(null), 1200);
   };
 
-  // Setup initial subtitles
+  // Setup initial subtitles (checks localStorage first, then media folder)
   useEffect(() => {
+    const subKey = `dhakaflix_saved_sub_${item.id}_${activeEpisode?.name || "main"}`;
+    try {
+      const saved = localStorage.getItem(subKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.cues && parsed.cues.length > 0) {
+          setSubCues(parsed.cues);
+          setShowSubtitles(true);
+          triggerHud(`Loaded saved subtitle: ${parsed.label || "Online Sub"}`);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("Error reading subtitle from localStorage:", e);
+    }
+
     const subs: { label: string; src: string }[] = [];
     if (item.subtitles && item.subtitles.length > 0) {
       item.subtitles.forEach((s, idx) => {
@@ -702,6 +721,16 @@ export default function VideoPlayer({
                   <span className="text-zinc-400 text-[10px]">Key: 'C'</span>
                 </div>
 
+                {/* Online Subtitle Finder Trigger */}
+                <button
+                  type="button"
+                  onClick={() => setShowOnlineSubtitleModal(true)}
+                  className="w-full py-1.5 px-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 transition shadow-md shadow-red-600/30"
+                >
+                  <SearchIcon className="w-3.5 h-3.5" />
+                  <span>Find Online Subtitles (Auto-Save)</span>
+                </button>
+
                 {/* Upload Local SRT */}
                 <div>
                   <label className="block text-zinc-400 mb-1">Load Custom Subtitle (.srt / .vtt):</label>
@@ -830,6 +859,23 @@ export default function VideoPlayer({
             })}
           </div>
         </div>
+      )}
+
+      {/* Online Subtitle Finder Modal */}
+      {showOnlineSubtitleModal && (
+        <SubtitleFinderModal
+          mediaId={item.id}
+          mediaTitle={item.title}
+          year={item.year}
+          seasonNum={activeSeason?.season}
+          episodeName={activeEpisode?.name}
+          onApplySubtitle={(cues, label) => {
+            setSubCues(cues);
+            setShowSubtitles(true);
+            triggerHud(`Applied & Saved Subtitle: ${label}`);
+          }}
+          onClose={() => setShowOnlineSubtitleModal(false)}
+        />
       )}
     </div>
   );
