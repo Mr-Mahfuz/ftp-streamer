@@ -231,7 +231,7 @@ export default function Home() {
           </div>
           <div className="flex items-center space-x-2 flex-shrink-0">
             <span className="bg-zinc-800 px-2 py-1 rounded text-[11px] text-zinc-400 font-mono">
-              Shortcuts: [←/→] 5s | [↑/↓] Vol | [C] Subs | [F] Fullscreen
+              Shortcuts: [←/→] 5s | [↑/↓] Vol | [B/A] Audio Track | [C] Subs | [F] Fullscreen
             </span>
           </div>
         </div>

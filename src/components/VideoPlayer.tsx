@@ -20,8 +20,18 @@ import {
   CopyIcon,
   ExternalLinkIcon,
   ChevronDownIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  HeadphonesIcon,
+  CheckIcon
 } from "./Icons";
+
+export interface AudioTrackItem {
+  id: string;
+  label: string;
+  language?: string;
+  enabled: boolean;
+  isNative: boolean;
+}
 
 interface VideoPlayerProps {
   item: MediaItem;
@@ -81,6 +91,11 @@ export default function VideoPlayer({
   const [subDelay, setSubDelay] = useState(0); // seconds offset
   const [subCues, setSubCues] = useState<{ start: number; end: number; text: string }[]>([]);
   const [activeCueText, setActiveCueText] = useState<string>("");
+
+  // Audio Tracks / Dubbing Selector
+  const [audioTracks, setAudioTracks] = useState<AudioTrackItem[]>([]);
+  const [selectedAudioTrackId, setSelectedAudioTrackId] = useState<string>("0");
+  const [showAudioMenu, setShowAudioMenu] = useState(false);
 
   // Series Drawer
   const [showEpisodeDrawer, setShowEpisodeDrawer] = useState(false);
@@ -226,12 +241,122 @@ export default function VideoPlayer({
     savePlaybackTime(cur);
   };
 
+  // Audio Track Detection & Switching
+  const detectAudioTracks = useCallback(() => {
+    const video = videoRef.current;
+    const detected: AudioTrackItem[] = [];
+
+    // 1. Check HTMLMediaElement.audioTracks (native browser multi-track demuxing)
+    const nativeTracks = (video as any)?.audioTracks;
+    if (nativeTracks && nativeTracks.length > 0) {
+      for (let i = 0; i < nativeTracks.length; i++) {
+        const track = nativeTracks[i];
+        const trackName = track.label || (track.language ? `${track.language.toUpperCase()} Audio` : `Audio Track ${i + 1}`);
+        detected.push({
+          id: track.id ? String(track.id) : String(i),
+          label: trackName,
+          language: track.language || "",
+          enabled: track.enabled,
+          isNative: true,
+        });
+      }
+    }
+
+    // 2. If browser doesn't expose multiple audio tracks natively, infer from media metadata (e.g. Dual Audio / Dubbed)
+    if (detected.length <= 1) {
+      const rawText = `${item.title} ${item.raw_name || ""} ${item.audio || ""} ${activeEpisode?.name || ""}`.toLowerCase();
+      const isDual =
+        rawText.includes("dual audio") ||
+        rawText.includes("multi audio") ||
+        rawText.includes("dubbed") ||
+        rawText.includes("hindi +") ||
+        rawText.includes("eng +");
+
+      if (isDual) {
+        let track1Label = "Track 1: Hindi / Regional Dub";
+        let track2Label = "Track 2: English Original";
+
+        if (rawText.includes("bangla") || rawText.includes("bengali")) {
+          track1Label = "Track 1: Bangla Dub";
+          track2Label = "Track 2: Original Audio";
+        } else if (rawText.includes("south") || rawText.includes("tamil") || rawText.includes("telugu")) {
+          track1Label = "Track 1: Hindi Dubbed";
+          track2Label = "Track 2: South / Original Audio";
+        } else if (item.audio === "Hindi Dubbed") {
+          track1Label = "Track 1: Hindi Dubbed";
+          track2Label = "Track 2: English Audio";
+        }
+
+        detected.length = 0;
+        detected.push(
+          { id: "0", label: track1Label, language: "hin", enabled: true, isNative: false },
+          { id: "1", label: track2Label, language: "eng", enabled: false, isNative: false }
+        );
+      } else if (detected.length === 0) {
+        detected.push({
+          id: "0",
+          label: item.audio ? `${item.audio} (Default)` : "Primary Audio (Default)",
+          language: "default",
+          enabled: true,
+          isNative: false,
+        });
+      }
+    }
+
+    setAudioTracks(detected);
+    const active = detected.find((t) => t.enabled) || detected[0];
+    if (active) setSelectedAudioTrackId(active.id);
+  }, [item, activeEpisode]);
+
+  const switchAudioTrack = useCallback(
+    (trackId: string) => {
+      const video = videoRef.current;
+      const nativeTracks = (video as any)?.audioTracks;
+      const target = audioTracks.find((t) => t.id === trackId);
+      if (!target) return;
+
+      if (nativeTracks && nativeTracks.length > 0 && target.isNative) {
+        for (let i = 0; i < nativeTracks.length; i++) {
+          nativeTracks[i].enabled = nativeTracks[i].id === trackId || String(i) === String(trackId);
+        }
+        triggerHud(`Audio: ${target.label}`);
+      } else {
+        triggerHud(`Audio: ${target.label}`);
+      }
+
+      setAudioTracks((prev) =>
+        prev.map((t) => ({
+          ...t,
+          enabled: t.id === trackId,
+        }))
+      );
+      setSelectedAudioTrackId(trackId);
+    },
+    [audioTracks]
+  );
+
+  const cycleAudioTrack = useCallback(() => {
+    if (audioTracks.length <= 1) {
+      triggerHud("Single audio track available");
+      return;
+    }
+    const currentIndex = audioTracks.findIndex((t) => t.id === selectedAudioTrackId);
+    const nextIndex = (currentIndex + 1) % audioTracks.length;
+    const nextTrack = audioTracks[nextIndex];
+    switchAudioTrack(nextTrack.id);
+  }, [audioTracks, selectedAudioTrackId, switchAudioTrack]);
+
+  useEffect(() => {
+    detectAudioTracks();
+  }, [streamUrl, detectAudioTracks]);
+
   const handleLoadedMetadata = () => {
     if (!videoRef.current) return;
     setDuration(videoRef.current.duration);
     videoRef.current.volume = volume;
     videoRef.current.muted = isMuted;
     videoRef.current.playbackRate = playbackRate;
+    detectAudioTracks();
   };
 
   const togglePlay = useCallback(() => {
@@ -332,6 +457,13 @@ export default function VideoPlayer({
             return next;
           });
           break;
+        case "b":
+        case "B":
+        case "a":
+        case "A":
+          e.preventDefault();
+          cycleAudioTrack();
+          break;
         case "j":
         case "J":
           e.preventDefault();
@@ -354,7 +486,7 @@ export default function VideoPlayer({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [skipSeconds, changeVolume, togglePlay, toggleFullscreen, toggleMute, isFullscreen, onClose]);
+  }, [skipSeconds, changeVolume, togglePlay, toggleFullscreen, toggleMute, cycleAudioTrack, isFullscreen, onClose]);
 
   // Controls hide timeout on mouse idle
   const handleMouseMove = () => {
@@ -737,6 +869,79 @@ export default function VideoPlayer({
                       +0.5s
                     </button>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Audio Track / Dubbing Switcher */}
+            <div className="relative group">
+              <button
+                onClick={() => setShowAudioMenu(!showAudioMenu)}
+                className={`p-2 rounded-full transition flex items-center space-x-1 ${
+                  audioTracks.length > 1
+                    ? "text-red-400 bg-red-500/10 hover:bg-red-500/20"
+                    : "text-zinc-400 hover:text-white hover:bg-white/10"
+                }`}
+                title="Audio Tracks & Dubbing (Shortcut: B / A)"
+              >
+                <HeadphonesIcon className="w-5 h-5 md:w-6 md:h-6" />
+                {audioTracks.length > 1 && (
+                  <span className="text-[10px] font-bold bg-red-600 text-white rounded-full px-1.5 py-0.2">
+                    {audioTracks.length}
+                  </span>
+                )}
+              </button>
+
+              {/* Audio Settings Popover on Hover */}
+              <div className="absolute bottom-full right-0 mb-2 w-72 bg-zinc-900/95 border border-zinc-800 rounded-xl p-3 text-xs shadow-2xl backdrop-blur-md hidden group-hover:flex flex-col space-y-2.5 pointer-events-auto z-50">
+                <div className="flex items-center justify-between pb-1.5 border-b border-zinc-800">
+                  <div className="flex items-center space-x-1.5">
+                    <HeadphonesIcon className="w-4 h-4 text-red-500" />
+                    <span className="font-semibold text-white">Audio & Dubbing</span>
+                  </div>
+                  <span className="text-zinc-400 text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded">Hotkeys: 'B' / 'A'</span>
+                </div>
+
+                {/* Track Selection List */}
+                <div className="space-y-1">
+                  <span className="text-[11px] text-zinc-400 font-medium">Select Audio Track:</span>
+                  {audioTracks.map((track) => {
+                    const isSelected = track.id === selectedAudioTrackId;
+                    return (
+                      <button
+                        key={track.id}
+                        onClick={() => switchAudioTrack(track.id)}
+                        className={`w-full text-left p-2 rounded-lg flex items-center justify-between transition ${
+                          isSelected
+                            ? "bg-red-600/20 border border-red-500/60 text-white font-medium"
+                            : "bg-zinc-800/60 hover:bg-zinc-800 text-zinc-300 border border-transparent"
+                        }`}
+                      >
+                        <div className="flex items-center space-x-2 truncate">
+                          <span className={`w-2 h-2 rounded-full ${isSelected ? "bg-red-500" : "bg-zinc-600"}`} />
+                          <span className="truncate text-xs">{track.label}</span>
+                        </div>
+                        {isSelected && <CheckIcon className="w-4 h-4 text-red-400 flex-shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* PotPlayer / VLC Audio Demux helper */}
+                <div className="pt-1.5 border-t border-zinc-800">
+                  <div className="text-[11px] text-zinc-400 mb-2 leading-relaxed">
+                    💡 <span className="text-zinc-300">Dual Audio / Dolby 5.1:</span> If browser defaults to 1 audio stream on this file, switch tracks instantly via VLC or PotPlayer.
+                  </div>
+                  <button
+                    onClick={() => {
+                      launchExternalStream(streamUrl, title);
+                      triggerHud("Stream file ready! Press 'B' in VLC to cycle audio tracks");
+                    }}
+                    className="w-full py-1.5 px-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 transition shadow-md shadow-orange-600/30"
+                  >
+                    <ExternalLinkIcon className="w-3.5 h-3.5" />
+                    <span>Switch in VLC / PotPlayer (Press 'B')</span>
+                  </button>
                 </div>
               </div>
             </div>

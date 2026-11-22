@@ -86,13 +86,18 @@ The comprehensive crawler (`scripts/crawl_comprehensive.py`) systematically trav
 
 ---
 
-## 🔊 5. Audio Architecture & Video Player
+## 🔊 5. Audio Architecture, Dubbing & Video Player
 
-### Native Browser Audio (No CORS Silencing)
-* **Why previous Web Audio failed**: In standard browser security, calling `AudioContext.createMediaElementSource(video)` on a cross-origin media stream (`http://172.16.50.x`) without `Access-Control-Allow-Origin: *` headers forces the Web Audio API to output **SILENCE (zeroes)**.
-* **The Solution**: Audio is routed directly from the HTML5 `<video>` element to the system speaker without Web Audio interception. Standard volume `0-100%` and mute toggle work with crisp stereo sound.
-* **Dolby Digital / DTS 5.1/7.1 External Fallback**:
-  - For MKV files with multi-channel AC-3, E-AC-3, or DTS audio codecs that browsers do not decode natively, a 1-click **"VLC Stream"** button (`vlc://${streamUrl}`) opens the live network stream directly in VLC or external media players with full hardware decoding.
+### Native Browser Audio & Multi-Track Switching
+* **Native Multi-Track Demuxing**: `HTMLMediaElement.audioTracks` API is queried to identify and switch between all audio streams (e.g. Hindi Dubbed, English Original, Regional Dubs) with instant HUD visual feedback.
+* **Dual Audio & Dubbing Switcher**:
+  - The player inspects filename and catalog metadata (`[Dual Audio]`, `Hindi Dubbed`, `Multi Audio`, `Bangla Dub`).
+  - Displays a clean Audio & Dubbing selector menu right next to the subtitle button.
+  - Pressing **`B`** (official VLC hotkey) or **`A`** instantly cycles through available audio tracks.
+* **Why previous Web Audio failed**: In standard browser security, calling `AudioContext.createMediaElementSource(video)` on a cross-origin media stream (`http://172.16.50.x`) without `Access-Control-Allow-Origin: *` headers forces the Web Audio API to output **SILENCE (zeroes)**. Audio is routed directly from HTML5 `<video>` for crystal-clear sound.
+* **Dolby Digital / DTS 5.1/7.1 & Secondary MKV Track Demuxing**:
+  - For MKV files where Chromium's internal demuxer does not expose secondary AC-3/E-AC-3/DTS audio streams to JavaScript, a 1-click **"Open in VLC / PotPlayer"** button generates an instant `.m3u` stream shortcut.
+  - In VLC or PotPlayer, pressing **`B`** cycles all 5.1/7.1 surround sound audio tracks with full hardware acceleration.
 
 ---
 
@@ -106,7 +111,6 @@ The comprehensive crawler (`scripts/crawl_comprehensive.py`) systematically trav
   - Queries `video.buffered` to calculate and render the buffer segment progress bar underneath the playback scrubber.
   - Displays `Buffer: Xs ahead` in the UI.
 * **Preload Optimization**: `preload="metadata"` is set on load so that whole files are never downloaded until the user actually plays the video.
-* **Audio Boost**: MKV multi-channel audio tracks (AC3/5.1) are boosted up to 300% volume via Web Audio API `AudioContext.createGain()`.
 
 ### Keyboard Shortcuts:
 | Key | Action |
@@ -114,6 +118,7 @@ The comprehensive crawler (`scripts/crawl_comprehensive.py`) systematically trav
 | **Arrow Left / Right** | Skip **5 seconds** backward / forward |
 | **Arrow Up / Down** | Adjust Volume by **10%** |
 | **Space** | Play / Pause toggle |
+| **B / A** | Cycle Audio Tracks / Dubbing (Hindi / English / Dual Audio) |
 | **F** | Toggle Fullscreen mode |
 | **M** | Toggle Mute |
 | **C** | Toggle Subtitles On / Off |
