@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import SubtitleFinderModal, { ParsedCue } from "./SubtitleFinderModal";
 import { SearchIcon, SparklesIcon } from "./Icons";
 import { MediaItem, Episode, Season } from "../types";
+import { launchExternalStream } from "../utils/playerUtils";
 import {
   PlayIcon,
   PauseIcon,
@@ -386,8 +387,8 @@ export default function VideoPlayer({
   const copyDirectUrl = () => {
     navigator.clipboard.writeText(streamUrl);
     setCopiedUrl(true);
-    triggerHud("Stream URL copied to clipboard!");
-    setTimeout(() => setCopiedUrl(false), 2000);
+    triggerHud("Stream URL copied! (In VLC: Media > Open Network Stream or Ctrl+N)");
+    setTimeout(() => setCopiedUrl(false), 2500);
   };
 
   const bufferPercent = duration > 0 ? (bufferedTime / duration) * 100 : 0;
@@ -491,24 +492,18 @@ export default function VideoPlayer({
             </button>
           )}
 
-          {/* VLC / PotPlayer Protocol Buttons */}
-          <a
-            href={`vlc://${streamUrl}`}
-            className="hidden md:flex items-center space-x-1 px-3 py-1.5 bg-orange-600/80 hover:bg-orange-600 text-white text-xs font-semibold rounded-lg transition"
-            title="Stream in VLC Media Player directly"
+          {/* 1-Click Launch in VLC / PotPlayer via .m3u Stream File */}
+          <button
+            onClick={() => {
+              launchExternalStream(streamUrl, title);
+              triggerHud("Stream file ready! Click to open in VLC or PotPlayer");
+            }}
+            className="flex items-center space-x-1.5 px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold rounded-xl transition shadow-md shadow-orange-600/30"
+            title="Stream in VLC or PotPlayer directly (Opens via instant stream link with full surround sound & subtitles)"
           >
             <ExternalLinkIcon className="w-3.5 h-3.5" />
-            <span>Open in VLC</span>
-          </a>
-
-          <a
-            href={`potplayer://${streamUrl}`}
-            className="hidden lg:flex items-center space-x-1 px-3 py-1.5 bg-yellow-600/80 hover:bg-yellow-600 text-white text-xs font-semibold rounded-lg transition"
-            title="Stream in PotPlayer directly"
-          >
-            <ExternalLinkIcon className="w-3.5 h-3.5" />
-            <span>PotPlayer</span>
-          </a>
+            <span>Open in VLC / PotPlayer</span>
+          </button>
 
           <button
             onClick={copyDirectUrl}
@@ -632,14 +627,17 @@ export default function VideoPlayer({
 
           {/* Right Controls: Subtitles, Volume Boost, Speed, Fullscreen */}
           <div className="flex items-center space-x-2 md:space-x-3">
-            {/* Direct VLC Stream for Dolby / DTS */}
-            <a
-              href={`vlc://${streamUrl}`}
-              className="hidden sm:flex items-center space-x-1 px-2.5 py-1.5 bg-orange-600/80 hover:bg-orange-600 text-white text-xs font-semibold rounded-lg transition"
-              title="Stream with VLC Media Player (Supports 5.1/7.1 Dolby AC3 & DTS)"
+            {/* Direct VLC / PotPlayer Stream for Dolby / DTS */}
+            <button
+              onClick={() => {
+                launchExternalStream(streamUrl, title);
+                triggerHud("Stream file ready! Click to open in VLC/PotPlayer");
+              }}
+              className="hidden sm:flex items-center space-x-1 px-2.5 py-1.5 bg-orange-600/90 hover:bg-orange-600 text-white text-xs font-semibold rounded-lg transition"
+              title="Stream in VLC or PotPlayer directly (Supports 5.1/7.1 Dolby AC3 & DTS)"
             >
-              <span>VLC Stream</span>
-            </a>
+              <span>VLC / PotPlayer (.m3u)</span>
+            </button>
 
             {/* Playback Rate Dropdown */}
             <select

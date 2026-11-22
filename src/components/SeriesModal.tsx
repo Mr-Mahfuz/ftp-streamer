@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { MediaItem, Season, Episode } from "../types";
+import { launchExternalStream } from "../utils/playerUtils";
 import {
   CloseIcon,
   PlayIcon,
@@ -207,13 +208,13 @@ export default function SeriesModal({
                     <span>Stream</span>
                   </button>
 
-                  <a
-                    href={`vlc://${ep.url}`}
+                  <button
+                    onClick={() => launchExternalStream(ep.url, `${series.title} - ${currentSeason.season_name} - ${ep.name}`)}
                     className="hidden sm:flex p-1.5 text-zinc-400 hover:text-orange-400 rounded-lg hover:bg-zinc-800 transition"
-                    title="Open episode in VLC"
+                    title="Stream episode in VLC / PotPlayer (.m3u)"
                   >
                     <ExternalLinkIcon className="w-4 h-4" />
-                  </a>
+                  </button>
 
                   <a
                     href={ep.url}

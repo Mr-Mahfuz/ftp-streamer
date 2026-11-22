@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { MediaItem } from "../types";
+import { launchExternalStream } from "../utils/playerUtils";
 import {
   PlayIcon,
   DownloadIcon,
@@ -129,14 +130,14 @@ export default function MediaCard({
           </button>
 
           <div className="flex items-center space-x-1">
-            {/* Quick VLC button */}
-            <a
-              href={`vlc://${defaultDownloadUrl}`}
+            {/* Quick VLC / PotPlayer button */}
+            <button
+              onClick={() => launchExternalStream(defaultDownloadUrl, item.title)}
               className="p-1.5 text-zinc-400 hover:text-orange-400 rounded-lg hover:bg-zinc-800 transition"
-              title="Open stream in VLC"
+              title="Stream in VLC / PotPlayer (.m3u)"
             >
               <ExternalLinkIcon className="w-3.5 h-3.5" />
-            </a>
+            </button>
 
             {/* Direct Download button */}
             <a
