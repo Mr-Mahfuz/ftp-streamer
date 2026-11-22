@@ -66,7 +66,6 @@ export default function VideoPlayer({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [isBuffering, setIsBuffering] = useState(false);
-  const [volumeBoost, setVolumeBoost] = useState(1); // 1 = 100%, 2 = 200%, 3 = 300%
 
   // HUD feedback for keyboard actions
   const [hudMessage, setHudMessage] = useState<string | null>(null);
@@ -85,10 +84,6 @@ export default function VideoPlayer({
   // Series Drawer
   const [showEpisodeDrawer, setShowEpisodeDrawer] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
-
-  // Audio Context for booster
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const gainNodeRef = useRef<GainNode | null>(null);
 
   const triggerHud = (msg: string) => {
     setHudMessage(msg);
@@ -191,38 +186,6 @@ export default function VideoPlayer({
     setActiveCueText(currentCue ? currentCue.text : "");
   }, [currentTime, showSubtitles, subCues, subDelay]);
 
-  // Audio Booster Setup via Web Audio API
-  const initAudioBoost = () => {
-    if (!videoRef.current || audioCtxRef.current) return;
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      const ctx = new AudioCtx();
-      const source = ctx.createMediaElementSource(videoRef.current);
-      const gain = ctx.createGain();
-      gain.gain.value = volumeBoost;
-      source.connect(gain);
-      gain.connect(ctx.destination);
-      audioCtxRef.current = ctx;
-      gainNodeRef.current = gain;
-    } catch (e) {
-      console.warn("Web Audio Gain not available:", e);
-    }
-  };
-
-  const handleVolumeBoostChange = (newBoost: number) => {
-    setVolumeBoost(newBoost);
-    if (!gainNodeRef.current) {
-      initAudioBoost();
-    }
-    if (gainNodeRef.current && audioCtxRef.current) {
-      if (audioCtxRef.current.state === "suspended") {
-        audioCtxRef.current.resume();
-      }
-      gainNodeRef.current.gain.value = newBoost;
-    }
-    triggerHud(`Audio Volume Boost: ${Math.round(newBoost * 100)}%`);
-  };
-
   // Save playback time to localStorage
   useEffect(() => {
     const key = `playback_${item.id}_${activeEpisode?.name || "main"}`;
@@ -266,13 +229,18 @@ export default function VideoPlayer({
     if (!videoRef.current) return;
     setDuration(videoRef.current.duration);
     videoRef.current.volume = volume;
+    videoRef.current.muted = isMuted;
     videoRef.current.playbackRate = playbackRate;
   };
 
   const togglePlay = useCallback(() => {
     if (!videoRef.current) return;
     if (videoRef.current.paused) {
-      initAudioBoost();
+      if (videoRef.current.muted) {
+        videoRef.current.muted = false;
+        setIsMuted(false);
+      }
+      videoRef.current.volume = volume;
       videoRef.current.play();
       setIsPlaying(true);
       triggerHud("Play");
@@ -281,7 +249,7 @@ export default function VideoPlayer({
       setIsPlaying(false);
       triggerHud("Pause");
     }
-  }, []);
+  }, [volume]);
 
   const skipSeconds = useCallback((sec: number) => {
     if (!videoRef.current) return;
@@ -664,21 +632,14 @@ export default function VideoPlayer({
 
           {/* Right Controls: Subtitles, Volume Boost, Speed, Fullscreen */}
           <div className="flex items-center space-x-2 md:space-x-3">
-            {/* Audio Volume Booster Dropdown */}
-            <div className="relative group hidden sm:block">
-              <select
-                value={volumeBoost}
-                onChange={(e) => handleVolumeBoostChange(parseFloat(e.target.value))}
-                className="bg-zinc-800/90 text-xs text-zinc-300 px-2 py-1.5 rounded-lg border border-zinc-700 cursor-pointer focus:outline-none"
-                title="Boost dialogue / quiet audio"
-              >
-                <option value={1}>Vol 100%</option>
-                <option value={1.5}>Vol 150% (Boost)</option>
-                <option value={2}>Vol 200% (Boost)</option>
-                <option value={2.5}>Vol 250% (Boost)</option>
-                <option value={3}>Vol 300% (Max)</option>
-              </select>
-            </div>
+            {/* Direct VLC Stream for Dolby / DTS */}
+            <a
+              href={`vlc://${streamUrl}`}
+              className="hidden sm:flex items-center space-x-1 px-2.5 py-1.5 bg-orange-600/80 hover:bg-orange-600 text-white text-xs font-semibold rounded-lg transition"
+              title="Stream with VLC Media Player (Supports 5.1/7.1 Dolby AC3 & DTS)"
+            >
+              <span>VLC Stream</span>
+            </a>
 
             {/* Playback Rate Dropdown */}
             <select

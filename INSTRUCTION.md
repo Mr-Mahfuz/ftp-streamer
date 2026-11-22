@@ -68,27 +68,35 @@ The crawler scans the DhakaFlix directory listings in parallel, extracts media m
 ```bash
 npm run crawl
 ```
-*(Alternatively: `python scripts/crawl.py`)*
+*(Alternatively: `python scripts/crawl_comprehensive.py`)*
 
-### How the Crawler Operates:
-1. **Category Crawling**: Defined in `scripts/crawler_base.py`. Scans all 17 categories from the DhakaFlix navigation menus.
-2. **Multi-Threading**: Uses `ThreadPoolExecutor` (12-16 workers) to query directories simultaneously with ~1ms local BDIX latency.
-3. **Regex Extraction**: Parses the h5ai fallback HTML table to extract:
-   - Item Title & Clean Name
-   - Release Year (e.g., `(2026)`, `(2024– )`)
-   - Quality / Resolution (`1080P`, `720P`, `4K`)
-   - Audio tracks (`[Dual Audio]`, `[Hindi 5.1+English 5.1]`, `Bangla`)
-   - Poster image (`a_AL_.jpg` or `a_VL_.jpg`)
-   - Direct Stream Video URL (`.mkv`, `.mp4`, `.webm`)
-   - Subtitles (`.srt`, `.vtt`)
-4. **TV Series Traversal**:
-   - Detects `Season 1`, `Season 2` subfolders.
-   - Crawls inside each season folder to enumerate individual episode video files and sizes.
-5. **Output**: Writes the combined catalog to `public/data/catalog.json` (~3.6 MB for 740+ full titles with hundreds of TV episodes).
+### Understanding Directory Partitions:
+DhakaFlix organizes media into partitioned subfolders:
+* **Cartoon TV Series (`172.16.50.10`)**: Grouped into letter ranges:
+  - `Anime-TV Series ★ 0 — 9`
+  - `Anime-TV Series ♥ A — F` (e.g. Batman Beyond, Batman The Animated Series)
+  - `Anime-TV Series ♥ G — M`
+  - `Anime-TV Series ♦ N — S` (e.g. Phineas and Ferb)
+  - `Anime-TV Series ♦ T — Z` (e.g. The Batman, Tom and Jerry)
+* **TV & WEB Series (`172.16.50.12`)**: Partitioned into `0-9`, `A-L`, `M-R`, `S-Z`.
+* **Movies (`172.16.50.7`, `172.16.50.14`)**: Partitioned into 36+ year folders from `(1960-1994)` up to `(2026)`.
+* **Foreign Language Movies**: Partitioned by language subfolders.
+
+The comprehensive crawler (`scripts/crawl_comprehensive.py`) systematically traverses EVERY partition bucket so all letters of the alphabet and all years are indexed.
 
 ---
 
-## 🎬 5. Direct Streaming & Buffering Technique
+## 🔊 5. Audio Architecture & Video Player
+
+### Native Browser Audio (No CORS Silencing)
+* **Why previous Web Audio failed**: In standard browser security, calling `AudioContext.createMediaElementSource(video)` on a cross-origin media stream (`http://172.16.50.x`) without `Access-Control-Allow-Origin: *` headers forces the Web Audio API to output **SILENCE (zeroes)**.
+* **The Solution**: Audio is routed directly from the HTML5 `<video>` element to the system speaker without Web Audio interception. Standard volume `0-100%` and mute toggle work with crisp stereo sound.
+* **Dolby Digital / DTS 5.1/7.1 External Fallback**:
+  - For MKV files with multi-channel AC-3, E-AC-3, or DTS audio codecs that browsers do not decode natively, a 1-click **"VLC Stream"** button (`vlc://${streamUrl}`) opens the live network stream directly in VLC or external media players with full hardware decoding.
+
+---
+
+## 🎬 6. Direct Streaming & Buffering Technique
 
 ### Why It's Lightweight & Fast:
 * **Nginx HTTP 206 Partial Content**: The DhakaFlix servers natively support the `Range: bytes=X-Y` header.

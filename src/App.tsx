@@ -69,7 +69,7 @@ export default function Home() {
     fetchCatalog();
   }, []);
 
-  // Filter Catalog
+  // Filter Catalog with smart multi-token search
   const filteredItems = useMemo(() => {
     return catalog.filter((item) => {
       // Menu filter
@@ -80,15 +80,18 @@ export default function Home() {
       if (selectedCategory && item.category_id !== selectedCategory) {
         return false;
       }
-      // Search query
+      // Smart token-based multi-keyword search
       if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const titleMatch = item.title.toLowerCase().includes(q);
-        const catMatch = item.category_name.toLowerCase().includes(q);
-        const yearMatch = item.year.toLowerCase().includes(q);
-        const qualMatch = item.quality.toLowerCase().includes(q);
-        const audioMatch = item.audio ? item.audio.toLowerCase().includes(q) : false;
-        if (!titleMatch && !catMatch && !yearMatch && !qualMatch && !audioMatch) {
+        const normalizedQuery = searchQuery.toLowerCase().replace(/&/g, "and");
+        const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
+        
+        const fullSearchableText = `${item.title} ${item.category_name} ${item.year} ${item.quality} ${item.audio || ""} ${item.filename || ""}`
+          .toLowerCase()
+          .replace(/&/g, "and");
+
+        // Every token typed by the user must match somewhere in the item's info
+        const allTokensMatch = tokens.every((tok) => fullSearchableText.includes(tok));
+        if (!allTokensMatch) {
           return false;
         }
       }
@@ -343,20 +346,52 @@ export default function Home() {
             ) : filteredItems.length === 0 ? (
               <div className="p-12 text-center bg-zinc-900/30 border border-zinc-800/60 rounded-3xl">
                 <SearchIcon className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
-                <h3 className="text-lg font-bold text-white">No media found</h3>
-                <p className="text-xs text-zinc-400 mt-1">
-                  Try adjusting your search query or selecting another category.
+                <h3 className="text-lg font-bold text-white">No media found for "{searchQuery}"</h3>
+                <p className="text-xs text-zinc-400 mt-1 max-w-md mx-auto">
+                  {selectedCategory || selectedMenu !== "all"
+                    ? "It might be under a different category (e.g. Cartoon TV Series, Animation Movies, or English Movies)."
+                    : "Try searching with fewer words or try one of the popular titles below."}
                 </p>
-                <button
-                  onClick={() => {
-                    setSearchQuery("");
-                    setSelectedCategory(null);
-                    setSelectedMenu("all");
-                  }}
-                  className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition"
-                >
-                  Reset All Filters
-                </button>
+                <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
+                  {(selectedCategory || selectedMenu !== "all") && (
+                    <button
+                      onClick={() => {
+                        setSelectedCategory(null);
+                        setSelectedMenu("all");
+                      }}
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition shadow-lg shadow-purple-600/30"
+                    >
+                      Search All Categories
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setSearchQuery("");
+                      setSelectedCategory(null);
+                      setSelectedMenu("all");
+                    }}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition"
+                  >
+                    Reset All Filters
+                  </button>
+                </div>
+                {/* Popular Search Suggestions */}
+                <div className="mt-6 pt-6 border-t border-zinc-800/60 flex items-center justify-center flex-wrap gap-2 text-xs">
+                  <span className="text-zinc-500">Popular Searches:</span>
+                  {["Batman", "Phineas", "Dark Knight", "Spider-Man", "Avengers"].map((sug) => (
+                    <button
+                      key={sug}
+                      onClick={() => {
+                        setSearchQuery(sug);
+                        setSelectedCategory(null);
+                        setSelectedMenu("all");
+                      }}
+                      className="px-2.5 py-1 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded-lg transition"
+                    >
+                      {sug}
+                    </button>
+                  ))}
+                </div>
               </div>
             ) : (
               <>
