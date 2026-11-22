@@ -85,6 +85,7 @@ export default function VideoPlayer({
 
   // Subtitles
   const [showSubtitles, setShowSubtitles] = useState(false);
+  const [showSubtitlesMenu, setShowSubtitlesMenu] = useState(false);
   const [showOnlineSubtitleModal, setShowOnlineSubtitleModal] = useState(false);
   const [subtitleTracks, setSubtitleTracks] = useState<{ label: string; src: string }[]>([]);
   const [selectedSubTrack, setSelectedSubTrack] = useState<string>("");
@@ -495,8 +496,21 @@ export default function VideoPlayer({
     setShowControls(true);
     if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     controlsTimeoutRef.current = setTimeout(() => {
-      if (isPlaying) setShowControls(false);
-    }, 3000);
+      if (isPlaying) {
+        setShowControls(false);
+        setShowAudioMenu(false);
+        setShowSubtitlesMenu(false);
+      }
+    }, 3500);
+  };
+
+  const handleVideoClick = () => {
+    if (showAudioMenu || showSubtitlesMenu) {
+      setShowAudioMenu(false);
+      setShowSubtitlesMenu(false);
+      return;
+    }
+    togglePlay();
   };
 
   const formatTime = (seconds: number) => {
@@ -553,7 +567,7 @@ export default function VideoPlayer({
           setIsBuffering(false);
           setStreamError(true);
         }}
-        onClick={togglePlay}
+        onClick={handleVideoClick}
         className="w-full h-full object-contain cursor-pointer"
       />
 
@@ -643,28 +657,40 @@ export default function VideoPlayer({
         </div>
       )}
 
+      {/* Center Big Play Button (Mobile & Desktop when paused) */}
+      {!isPlaying && !isBuffering && !streamError && (
+        <div
+          onClick={handleVideoClick}
+          className="absolute inset-0 flex items-center justify-center cursor-pointer pointer-events-auto z-20"
+        >
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-red-600/90 hover:bg-red-600 text-white flex items-center justify-center shadow-2xl transform active:scale-90 transition">
+            <PlayIcon className="w-8 h-8 sm:w-10 sm:h-10 ml-1" />
+          </div>
+        </div>
+      )}
+
       {/* Top Bar Controls */}
       <div
-        className={`absolute top-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-b from-black/90 via-black/50 to-transparent flex items-center justify-between transition-opacity duration-300 ${
+        className={`absolute top-0 left-0 right-0 p-3 sm:p-4 md:p-6 bg-gradient-to-b from-black/95 via-black/60 to-transparent flex items-center justify-between transition-opacity duration-300 z-30 ${
           showControls ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       >
-        <div className="flex items-center space-x-3 text-white">
+        <div className="flex items-center space-x-2 sm:space-x-3 text-white min-w-0 pr-2">
           <button
             onClick={onClose}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors text-zinc-300 hover:text-white"
+            className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full transition-colors text-zinc-300 hover:text-white flex-shrink-0"
             title="Close Player (Esc)"
           >
-            <CloseIcon className="w-6 h-6" />
+            <CloseIcon className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
-          <div>
-            <h2 className="text-lg md:text-xl font-bold truncate max-w-xl">{title}</h2>
-            <div className="flex items-center space-x-2 text-xs text-zinc-400 mt-0.5">
-              <span className="bg-red-600/80 text-white px-2 py-0.5 rounded font-medium">{item.quality}</span>
-              {item.audio && <span className="bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded">{item.audio}</span>}
-              <span className="text-emerald-400">● BDIX Fast Stream</span>
+          <div className="min-w-0">
+            <h2 className="text-sm sm:text-base md:text-xl font-bold truncate max-w-[150px] sm:max-w-xs md:max-w-md lg:max-w-xl">{title}</h2>
+            <div className="flex items-center space-x-1.5 sm:space-x-2 text-[10px] sm:text-xs text-zinc-400 mt-0.5">
+              <span className="bg-red-600/80 text-white px-1.5 py-0.2 rounded font-medium">{item.quality}</span>
+              {item.audio && <span className="bg-zinc-800 text-zinc-300 px-1.5 py-0.2 rounded truncate max-w-[80px] sm:max-w-none">{item.audio}</span>}
+              <span className="text-emerald-400 hidden sm:inline">● BDIX Fast Stream</span>
               {bufferedTime > currentTime && (
-                <span className="text-zinc-400">
+                <span className="text-zinc-400 hidden md:inline">
                   Buffer: {Math.max(0, Math.round(bufferedTime - currentTime))}s ahead
                 </span>
               )}
@@ -673,14 +699,14 @@ export default function VideoPlayer({
         </div>
 
         {/* Quick Top Actions: External Players, URL, Download */}
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
           {isSeries && (
             <button
               onClick={() => setShowEpisodeDrawer(!showEpisodeDrawer)}
-              className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-sm rounded-lg flex items-center space-x-1.5 border border-zinc-700 transition"
+              className="px-2 sm:px-3 py-1 sm:py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-xs sm:text-sm rounded-lg flex items-center space-x-1 border border-zinc-700 transition"
             >
               <span>Episodes</span>
-              <ChevronDownIcon className="w-4 h-4" />
+              <ChevronDownIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
           )}
 
@@ -690,28 +716,29 @@ export default function VideoPlayer({
               launchExternalStream(streamUrl, title);
               triggerHud("Stream file ready! Click to open in VLC or PotPlayer");
             }}
-            className="flex items-center space-x-1.5 px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold rounded-xl transition shadow-md shadow-orange-600/30"
-            title="Stream in VLC or PotPlayer directly (Opens via instant stream link with full surround sound & subtitles)"
+            className="flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold rounded-xl transition shadow-md shadow-orange-600/30"
+            title="Stream in VLC or PotPlayer directly"
           >
             <ExternalLinkIcon className="w-3.5 h-3.5" />
-            <span>Open in VLC / PotPlayer</span>
+            <span className="hidden sm:inline">Open in VLC</span>
+            <span className="sm:hidden text-[11px]">VLC</span>
           </button>
 
           <button
             onClick={copyDirectUrl}
-            className="p-2 hover:bg-white/10 rounded-full text-zinc-300 hover:text-white transition"
+            className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full text-zinc-300 hover:text-white transition"
             title="Copy Direct Stream URL"
           >
-            <CopyIcon className="w-5 h-5" />
+            <CopyIcon className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
 
           <a
             href={streamUrl}
             download
-            className="p-2 hover:bg-white/10 rounded-full text-zinc-300 hover:text-white transition"
+            className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full text-zinc-300 hover:text-white transition"
             title="Download Video File"
           >
-            <DownloadIcon className="w-5 h-5" />
+            <DownloadIcon className="w-4 h-4 sm:w-5 sm:h-5" />
           </a>
         </div>
       </div>
@@ -754,43 +781,43 @@ export default function VideoPlayer({
         {/* Action Buttons Row */}
         <div className="flex items-center justify-between text-white">
           {/* Left Controls: Play, Skips, Volume, Timers */}
-          <div className="flex items-center space-x-3 md:space-x-4">
+          <div className="flex items-center space-x-1.5 sm:space-x-3 md:space-x-4">
             <button
-              onClick={togglePlay}
-              className="p-2 hover:bg-white/10 rounded-full text-white transition transform active:scale-95"
+              onClick={handleVideoClick}
+              className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full text-white transition transform active:scale-95"
               title={isPlaying ? "Pause (Space)" : "Play (Space)"}
             >
-              {isPlaying ? <PauseIcon className="w-6 h-6 md:w-7 md:h-7" /> : <PlayIcon className="w-6 h-6 md:w-7 md:h-7" />}
+              {isPlaying ? <PauseIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7" /> : <PlayIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7" />}
             </button>
 
-            {/* Skip 5s Backwards & Forwards (User Requirement) */}
+            {/* Skip 5s Backwards & Forwards */}
             <button
               onClick={() => skipSeconds(-5)}
-              className="p-2 hover:bg-white/10 rounded-full text-zinc-300 hover:text-white transition flex items-center justify-center"
+              className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full text-zinc-300 hover:text-white transition flex items-center justify-center"
               title="Skip -5s (Left Arrow)"
             >
-              <SkipBack5Icon className="w-5 h-5 md:w-6 md:h-6" />
+              <SkipBack5Icon className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
             </button>
 
             <button
               onClick={() => skipSeconds(5)}
-              className="p-2 hover:bg-white/10 rounded-full text-zinc-300 hover:text-white transition flex items-center justify-center"
+              className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full text-zinc-300 hover:text-white transition flex items-center justify-center"
               title="Skip +5s (Right Arrow)"
             >
-              <SkipForward5Icon className="w-5 h-5 md:w-6 md:h-6" />
+              <SkipForward5Icon className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
             </button>
 
-            {/* Volume Control */}
-            <div className="flex items-center space-x-2 group">
+            {/* Volume Control (Slider hidden on phones, physical phone buttons used) */}
+            <div className="flex items-center space-x-1 sm:space-x-2 group">
               <button
                 onClick={toggleMute}
-                className="p-2 hover:bg-white/10 rounded-full text-zinc-300 hover:text-white transition"
+                className="p-1.5 hover:bg-white/10 rounded-full text-zinc-300 hover:text-white transition"
                 title="Mute (M)"
               >
                 {isMuted || volume === 0 ? (
-                  <VolumeMuteIcon className="w-5 h-5 md:w-6 md:h-6" />
+                  <VolumeMuteIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                 ) : (
-                  <VolumeIcon className="w-5 h-5 md:w-6 md:h-6" />
+                  <VolumeIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                 )}
               </button>
               <input
@@ -805,12 +832,12 @@ export default function VideoPlayer({
                   setIsMuted(val === 0);
                   if (videoRef.current) videoRef.current.volume = val;
                 }}
-                className="w-16 md:w-24 h-1.5 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-red-500"
+                className="hidden md:inline-block w-16 md:w-24 h-1.5 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-red-500"
               />
             </div>
 
             {/* Timers */}
-            <div className="text-xs md:text-sm text-zinc-400 font-mono">
+            <div className="text-[10px] sm:text-xs md:text-sm text-zinc-400 font-mono">
               <span>{formatTime(currentTime)}</span>
               <span className="mx-1">/</span>
               <span>{formatTime(duration)}</span>
@@ -818,14 +845,14 @@ export default function VideoPlayer({
           </div>
 
           {/* Right Controls: Subtitles, Volume Boost, Speed, Fullscreen */}
-          <div className="flex items-center space-x-2 md:space-x-3">
+          <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-3">
             {/* Direct VLC / PotPlayer Stream for Dolby / DTS */}
             <button
               onClick={() => {
                 launchExternalStream(streamUrl, title);
                 triggerHud("Stream file ready! Click to open in VLC/PotPlayer");
               }}
-              className="hidden sm:flex items-center space-x-1 px-2.5 py-1.5 bg-orange-600/90 hover:bg-orange-600 text-white text-xs font-semibold rounded-lg transition"
+              className="hidden md:flex items-center space-x-1 px-2.5 py-1.5 bg-orange-600/90 hover:bg-orange-600 text-white text-xs font-semibold rounded-lg transition"
               title="Stream in VLC or PotPlayer directly (Supports 5.1/7.1 Dolby AC3 & DTS)"
             >
               <span>VLC / PotPlayer (.m3u)</span>
@@ -839,7 +866,7 @@ export default function VideoPlayer({
                 setPlaybackRate(rate);
                 if (videoRef.current) videoRef.current.playbackRate = rate;
               }}
-              className="bg-zinc-800/90 text-xs text-zinc-300 px-2 py-1.5 rounded-lg border border-zinc-700 cursor-pointer focus:outline-none"
+              className="bg-zinc-800/90 text-[10px] sm:text-xs text-zinc-300 px-1 sm:px-2 py-1 rounded-md sm:rounded-lg border border-zinc-700 cursor-pointer focus:outline-none"
               title="Playback Speed"
             >
               <option value={0.5}>0.5x</option>
@@ -850,32 +877,61 @@ export default function VideoPlayer({
               <option value={2}>2.0x</option>
             </select>
 
-            {/* Subtitle Toggle & Menu */}
+            {/* Subtitle Toggle & Menu (Tap-friendly on Mobile) */}
             <div className="relative group">
               <button
                 onClick={() => {
-                  setShowSubtitles(!showSubtitles);
-                  triggerHud(!showSubtitles ? "Subtitles: ON" : "Subtitles: OFF");
+                  setShowSubtitlesMenu(!showSubtitlesMenu);
+                  setShowAudioMenu(false);
                 }}
-                className={`p-2 rounded-full transition ${
+                className={`p-1.5 sm:p-2 rounded-full transition ${
                   showSubtitles ? "text-red-500 bg-red-500/20" : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
                 title="Toggle Subtitle (C)"
               >
-                <SubtitlesIcon className="w-5 h-5 md:w-6 md:h-6" />
+                <SubtitlesIcon className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
 
-              {/* Subtitle Settings Popover on Hover */}
-              <div className="absolute bottom-full right-0 mb-2 w-64 bg-zinc-900/95 border border-zinc-800 rounded-xl p-3 text-xs shadow-2xl backdrop-blur-md hidden group-hover:flex flex-col space-y-2 pointer-events-auto">
+              {/* Subtitle Settings Popover */}
+              <div
+                className={`absolute bottom-full right-0 mb-2 w-72 max-w-[calc(100vw-24px)] bg-zinc-900/95 border border-zinc-800 rounded-xl p-3 text-xs shadow-2xl backdrop-blur-md flex-col space-y-2 pointer-events-auto z-50 ${
+                  showSubtitlesMenu ? "flex" : "hidden sm:group-hover:flex"
+                }`}
+              >
                 <div className="flex items-center justify-between pb-1 border-b border-zinc-800">
-                  <span className="font-semibold text-white">Subtitle Settings</span>
-                  <span className="text-zinc-400 text-[10px]">Key: 'C'</span>
+                  <div className="flex items-center space-x-1.5">
+                    <SubtitlesIcon className="w-4 h-4 text-red-500" />
+                    <span className="font-semibold text-white">Subtitle Settings</span>
+                  </div>
+                  <button
+                    onClick={() => setShowSubtitlesMenu(false)}
+                    className="p-1 text-zinc-400 hover:text-white rounded"
+                  >
+                    <CloseIcon className="w-3.5 h-3.5" />
+                  </button>
                 </div>
+
+                {/* Quick Toggle On/Off */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSubtitles(!showSubtitles);
+                    triggerHud(!showSubtitles ? "Subtitles: ON" : "Subtitles: OFF");
+                  }}
+                  className={`w-full py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 transition ${
+                    showSubtitles ? "bg-red-600 text-white" : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+                  }`}
+                >
+                  <span>{showSubtitles ? "Subtitles Enabled (Click to Turn Off)" : "Turn Subtitles On"}</span>
+                </button>
 
                 {/* Online Subtitle Finder Trigger */}
                 <button
                   type="button"
-                  onClick={() => setShowOnlineSubtitleModal(true)}
+                  onClick={() => {
+                    setShowSubtitlesMenu(false);
+                    setShowOnlineSubtitleModal(true);
+                  }}
                   className="w-full py-1.5 px-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 transition shadow-md shadow-red-600/30"
                 >
                   <SearchIcon className="w-3.5 h-3.5" />
@@ -933,18 +989,21 @@ export default function VideoPlayer({
               </div>
             </div>
 
-            {/* Audio Track / Dubbing Switcher */}
+            {/* Audio Track / Dubbing Switcher (Tap-friendly on Mobile) */}
             <div className="relative group">
               <button
-                onClick={() => setShowAudioMenu(!showAudioMenu)}
-                className={`p-2 rounded-full transition flex items-center space-x-1 ${
+                onClick={() => {
+                  setShowAudioMenu(!showAudioMenu);
+                  setShowSubtitlesMenu(false);
+                }}
+                className={`p-1.5 sm:p-2 rounded-full transition flex items-center space-x-1 ${
                   audioTracks.length > 1
                     ? "text-red-400 bg-red-500/10 hover:bg-red-500/20"
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
                 }`}
                 title="Audio Tracks & Dubbing (Shortcut: B / A)"
               >
-                <HeadphonesIcon className="w-5 h-5 md:w-6 md:h-6" />
+                <HeadphonesIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                 {audioTracks.length > 1 && (
                   <span className="text-[10px] font-bold bg-red-600 text-white rounded-full px-1.5 py-0.2">
                     {audioTracks.length}
@@ -952,14 +1011,23 @@ export default function VideoPlayer({
                 )}
               </button>
 
-              {/* Audio Settings Popover on Hover */}
-              <div className="absolute bottom-full right-0 mb-2 w-72 bg-zinc-900/95 border border-zinc-800 rounded-xl p-3 text-xs shadow-2xl backdrop-blur-md hidden group-hover:flex flex-col space-y-2.5 pointer-events-auto z-50">
+              {/* Audio Settings Popover */}
+              <div
+                className={`absolute bottom-full right-0 mb-2 w-72 max-w-[calc(100vw-24px)] bg-zinc-900/95 border border-zinc-800 rounded-xl p-3 text-xs shadow-2xl backdrop-blur-md flex-col space-y-2.5 pointer-events-auto z-50 ${
+                  showAudioMenu ? "flex" : "hidden sm:group-hover:flex"
+                }`}
+              >
                 <div className="flex items-center justify-between pb-1.5 border-b border-zinc-800">
                   <div className="flex items-center space-x-1.5">
                     <HeadphonesIcon className="w-4 h-4 text-red-500" />
                     <span className="font-semibold text-white">Audio & Dubbing</span>
                   </div>
-                  <span className="text-zinc-400 text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded">Hotkeys: 'B' / 'A'</span>
+                  <button
+                    onClick={() => setShowAudioMenu(false)}
+                    className="p-1 text-zinc-400 hover:text-white rounded"
+                  >
+                    <CloseIcon className="w-3.5 h-3.5" />
+                  </button>
                 </div>
 
                 {/* Track Selection List */}
@@ -970,7 +1038,10 @@ export default function VideoPlayer({
                     return (
                       <button
                         key={track.id}
-                        onClick={() => switchAudioTrack(track.id)}
+                        onClick={() => {
+                          switchAudioTrack(track.id);
+                          setShowAudioMenu(false);
+                        }}
                         className={`w-full text-left p-2 rounded-lg flex items-center justify-between transition ${
                           isSelected
                             ? "bg-red-600/20 border border-red-500/60 text-white font-medium"
@@ -1009,13 +1080,13 @@ export default function VideoPlayer({
             {/* Fullscreen Button */}
             <button
               onClick={toggleFullscreen}
-              className="p-2 hover:bg-white/10 rounded-full text-zinc-300 hover:text-white transition"
+              className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full text-zinc-300 hover:text-white transition"
               title="Fullscreen (F)"
             >
               {isFullscreen ? (
-                <ExitFullscreenIcon className="w-5 h-5 md:w-6 md:h-6" />
+                <ExitFullscreenIcon className="w-5 h-5 sm:w-6 sm:h-6" />
               ) : (
-                <FullscreenIcon className="w-5 h-5 md:w-6 md:h-6" />
+                <FullscreenIcon className="w-5 h-5 sm:w-6 sm:h-6" />
               )}
             </button>
           </div>
@@ -1024,7 +1095,7 @@ export default function VideoPlayer({
 
       {/* Series Episode Selector Drawer */}
       {isSeries && showEpisodeDrawer && (
-        <div className="absolute top-0 right-0 bottom-0 w-80 md:w-96 bg-zinc-950/95 border-l border-zinc-800 z-50 p-4 overflow-y-auto flex flex-col shadow-2xl backdrop-blur-xl">
+        <div className="absolute top-0 right-0 bottom-0 w-full sm:w-80 md:w-96 max-w-full bg-zinc-950/95 border-l border-zinc-800 z-50 p-4 overflow-y-auto flex flex-col shadow-2xl backdrop-blur-xl">
           <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
             <h3 className="font-bold text-white text-base">Series Episodes</h3>
             <button

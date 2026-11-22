@@ -19,7 +19,8 @@ import {
   DownloadIcon,
   SparklesIcon,
   CheckIcon,
-  ExternalLinkIcon
+  ExternalLinkIcon,
+  CloseIcon
 } from "./components/Icons";
 
 export default function Home() {
@@ -29,6 +30,30 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedMenu, setSelectedMenu] = useState<"all" | "movies" | "tv-series">("all");
   const [activeTab, setActiveTab] = useState<"library" | "games-software" | "tree">("library");
+
+  // Top alert banners visibility (removable & saved to localStorage)
+  const [showHttpsAlert, setShowHttpsAlert] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("dhakaflix_hide_https_alert") !== "true";
+  });
+  const [showStreamAlert, setShowStreamAlert] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("dhakaflix_hide_stream_alert") !== "true";
+  });
+
+  const dismissHttpsAlert = () => {
+    setShowHttpsAlert(false);
+    try {
+      localStorage.setItem("dhakaflix_hide_https_alert", "true");
+    } catch {}
+  };
+
+  const dismissStreamAlert = () => {
+    setShowStreamAlert(false);
+    try {
+      localStorage.setItem("dhakaflix_hide_stream_alert", "true");
+    } catch {}
+  };
 
   // Pagination State for high performance
   const [currentPage, setCurrentPage] = useState(1);
@@ -216,10 +241,10 @@ export default function Home() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* HTTPS Vercel Warning Banner */}
-        {typeof window !== "undefined" && window.location.protocol === "https:" && (
-          <div className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-amber-950/60 via-zinc-900/80 to-amber-950/40 border border-amber-500/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-200 shadow-xl">
-            <div className="flex items-start space-x-3">
+        {/* HTTPS Vercel Warning Banner (Removable & auto-hidden when searching) */}
+        {!searchQuery && showHttpsAlert && typeof window !== "undefined" && window.location.protocol === "https:" && (
+          <div className="relative mb-4 p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-950/60 via-zinc-900/80 to-amber-950/40 border border-amber-500/40 flex items-start justify-between gap-3 text-xs text-amber-200 shadow-xl">
+            <div className="flex items-start space-x-3 pr-2">
               <span className="p-2 bg-amber-500/20 text-amber-400 rounded-xl flex-shrink-0 text-base">
                 ⚠️
               </span>
@@ -230,28 +255,44 @@ export default function Home() {
                 </span>
               </div>
             </div>
+            <button
+              onClick={dismissHttpsAlert}
+              className="p-1 text-zinc-400 hover:text-white rounded-lg hover:bg-white/10 transition flex-shrink-0"
+              title="Dismiss notice"
+            >
+              <CloseIcon className="w-4 h-4" />
+            </button>
           </div>
         )}
 
-        {/* Info Banner: Streaming & Vercel Info */}
-        <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-red-950/40 via-zinc-900/60 to-purple-950/40 border border-zinc-800/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs text-zinc-300">
-          <div className="flex items-center space-x-2.5">
-            <span className="p-1.5 bg-red-600/20 text-red-400 rounded-lg">
-              <SparklesIcon className="w-4 h-4" />
-            </span>
-            <div>
-              <span className="font-bold text-white">Direct BDIX Streaming Activated: </span>
-              <span>
-                Enjoy smooth byte-range seeking, Arrow key controls (Up/Down volume, Left/Right 5s skip), subtitles, and batch downloading without local file downloads.
+        {/* Info Banner: Streaming & Shortcuts Info (Removable & auto-hidden when searching) */}
+        {!searchQuery && showStreamAlert && (
+          <div className="relative mb-4 sm:mb-6 p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-red-950/40 via-zinc-900/60 to-purple-950/40 border border-zinc-800/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs text-zinc-300">
+            <div className="flex items-center space-x-2.5 pr-2">
+              <span className="p-1.5 bg-red-600/20 text-red-400 rounded-lg flex-shrink-0">
+                <SparklesIcon className="w-4 h-4" />
               </span>
+              <div>
+                <span className="font-bold text-white">Direct BDIX Streaming Activated: </span>
+                <span>
+                  Enjoy smooth byte-range seeking, Arrow key controls (Up/Down volume, Left/Right 5s skip), subtitles, and batch downloading without local file downloads.
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2 flex-shrink-0 self-end md:self-auto">
+              <span className="hidden sm:inline bg-zinc-800 px-2 py-1 rounded text-[11px] text-zinc-400 font-mono">
+                Shortcuts: [←/→] 5s | [↑/↓] Vol | [B/A] Audio Track | [C] Subs | [F] Fullscreen
+              </span>
+              <button
+                onClick={dismissStreamAlert}
+                className="p-1 text-zinc-400 hover:text-white rounded-lg hover:bg-white/10 transition flex-shrink-0 ml-1"
+                title="Dismiss notice"
+              >
+                <CloseIcon className="w-4 h-4" />
+              </button>
             </div>
           </div>
-          <div className="flex items-center space-x-2 flex-shrink-0">
-            <span className="bg-zinc-800 px-2 py-1 rounded text-[11px] text-zinc-400 font-mono">
-              Shortcuts: [←/→] 5s | [↑/↓] Vol | [B/A] Audio Track | [C] Subs | [F] Fullscreen
-            </span>
-          </div>
-        </div>
+        )}
 
         {/* View Switcher: Library vs Tree Explorer */}
         {activeTab === "tree" ? (
