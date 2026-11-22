@@ -219,9 +219,16 @@ export default function Navbar({
             </div>
 
             {/* ISP BDIX Status Badge */}
-            <div className="hidden lg:flex items-center space-x-1.5 px-2.5 py-1 bg-zinc-900 border border-zinc-800 rounded-lg text-[10px] text-zinc-400">
+            <div
+              className="hidden lg:flex items-center space-x-1.5 px-2.5 py-1 bg-zinc-900 border border-zinc-800 rounded-lg text-[10px] text-zinc-400"
+              title="Streams directly from Dhaka ISP BDIX servers (172.16.50.x) on your Wi-Fi network"
+            >
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="font-mono">ISP BDIX Live</span>
+              <span className="font-mono">
+                {typeof window !== "undefined" && window.location.protocol === "https:"
+                  ? "ISP Wi-Fi (HTTPS)"
+                  : "ISP BDIX Live"}
+              </span>
             </div>
           </div>
         </div>

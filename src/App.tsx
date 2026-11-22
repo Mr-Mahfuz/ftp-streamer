@@ -216,6 +216,23 @@ export default function Home() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* HTTPS Vercel Warning Banner */}
+        {typeof window !== "undefined" && window.location.protocol === "https:" && (
+          <div className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-amber-950/60 via-zinc-900/80 to-amber-950/40 border border-amber-500/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-200 shadow-xl">
+            <div className="flex items-start space-x-3">
+              <span className="p-2 bg-amber-500/20 text-amber-400 rounded-xl flex-shrink-0 text-base">
+                ⚠️
+              </span>
+              <div>
+                <span className="font-bold text-white text-sm block">Vercel (HTTPS) & Local Wi-Fi BDIX Notice:</span>
+                <span className="text-zinc-300">
+                  Browsers block HTTP (<code>172.16.50.x</code>) video streams on HTTPS sites. To watch in browser: click the 🔒 icon next to URL ➔ <strong>Site settings</strong> ➔ Set <strong>Insecure content</strong> to <strong className="text-emerald-400">Allow</strong>. Or use the orange <strong>"Open in VLC / PotPlayer"</strong> button.
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Info Banner: Streaming & Vercel Info */}
         <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-red-950/40 via-zinc-900/60 to-purple-950/40 border border-zinc-800/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs text-zinc-300">
           <div className="flex items-center space-x-2.5">

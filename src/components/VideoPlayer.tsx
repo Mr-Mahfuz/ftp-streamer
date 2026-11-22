@@ -77,6 +77,7 @@ export default function VideoPlayer({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [isBuffering, setIsBuffering] = useState(false);
+  const [streamError, setStreamError] = useState(false);
 
   // HUD feedback for keyboard actions
   const [hudMessage, setHudMessage] = useState<string | null>(null);
@@ -204,6 +205,7 @@ export default function VideoPlayer({
 
   // Save playback time to localStorage
   useEffect(() => {
+    setStreamError(false);
     const key = `playback_${item.id}_${activeEpisode?.name || "main"}`;
     const saved = localStorage.getItem(key);
     if (saved && videoRef.current) {
@@ -544,11 +546,69 @@ export default function VideoPlayer({
         onPlaying={() => {
           setIsBuffering(false);
           setIsPlaying(true);
+          setStreamError(false);
         }}
         onPause={() => setIsPlaying(false)}
+        onError={() => {
+          setIsBuffering(false);
+          setStreamError(true);
+        }}
         onClick={togglePlay}
         className="w-full h-full object-contain cursor-pointer"
       />
+
+      {/* Stream Connection / Mixed Content Error Overlay */}
+      {streamError && (
+        <div className="absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-40 max-w-lg mx-auto">
+          <div className="w-16 h-16 rounded-full bg-red-600/20 text-red-500 flex items-center justify-center mb-4 border border-red-500/40">
+            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-bold text-white mb-2">Browser Blocked BDIX Stream</h3>
+          <p className="text-sm text-zinc-300 mb-5 leading-relaxed">
+            {typeof window !== "undefined" && window.location.protocol === "https:" ? (
+              <>
+                You are accessing this web app via <strong className="text-amber-400">HTTPS (Vercel)</strong>. Your browser security policy blocks direct connection to internal <strong className="text-red-400">HTTP (172.16.50.x)</strong> ISP servers.
+              </>
+            ) : (
+              <>
+                Could not connect to BDIX server at <code>172.16.50.x</code>. Please make sure you are connected to your Dhaka ISP Wi-Fi.
+              </>
+            )}
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-3 w-full justify-center mb-5">
+            <button
+              onClick={() => launchExternalStream(streamUrl, title)}
+              className="px-5 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-sm font-bold flex items-center justify-center space-x-2 transition shadow-lg shadow-orange-600/40"
+            >
+              <ExternalLinkIcon className="w-4 h-4" />
+              <span>Open in VLC / PotPlayer (Bypasses Block)</span>
+            </button>
+            <button
+              onClick={copyDirectUrl}
+              className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl text-sm font-medium transition"
+            >
+              Copy Stream URL
+            </button>
+          </div>
+
+          {typeof window !== "undefined" && window.location.protocol === "https:" && (
+            <div className="w-full bg-zinc-900/90 border border-zinc-800 rounded-xl p-3.5 text-xs text-left text-zinc-300 space-y-1.5">
+              <div className="font-semibold text-white flex items-center space-x-1.5">
+                <span>⚡ How to enable in-browser playback on Vercel:</span>
+              </div>
+              <ol className="list-decimal list-inside space-y-1 text-zinc-400 pl-1">
+                <li>Click the <strong>🔒 Padlock / Tune icon</strong> on the left side of your browser URL bar.</li>
+                <li>Click <strong>Site settings</strong>.</li>
+                <li>Find <strong>Insecure content</strong> and change it from <em>Block</em> to <strong className="text-emerald-400">Allow</strong>.</li>
+                <li>Reload this page — video will stream smoothly!</li>
+              </ol>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Center Buffering Spinner */}
       {isBuffering && (

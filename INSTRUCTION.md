@@ -26,7 +26,11 @@ DhakaFlix hosts its HTTP file directories on multiple private ISP IP addresses (
 | `http://172.16.50.12/` | TV & WEB Series (`0-9`, `A-L`, `M-R`, `S-Z` alphabet tree) |
 | `http://172.16.50.10/` | Cartoon TV Series, Documentary, WWE & AEW Wrestling, Awards & TV Shows |
 
-> **Crucial Networking Rule**: These IPs are private (RFC 1918) within your local ISP network. They can only be accessed directly from a computer/device connected to the ISP's connection or BDIX network.
+> **Crucial Networking & Vercel Rule**: 
+> 1. These IPs are private (RFC 1918) within your local ISP network. They can only be reached by devices connected to your ISP Wi-Fi.
+> 2. **Vercel / HTTPS Mixed Content Policy**: When deployed on Vercel (`https://...`), web browsers block direct connection to unencrypted `http://172.16.50.x` streams as "Mixed Content".
+>    - **To fix in browser (5 seconds)**: Click the 🔒 padlock icon in URL bar ➔ **Site settings** ➔ Set **Insecure content** to **Allow** ➔ Reload.
+>    - **Zero-restriction alternative**: Use the orange **"Open in VLC / PotPlayer"** button (which runs outside the browser and connects directly over Wi-Fi), or run locally via `npm run dev` (`http://localhost:5173`).
 
 ---
 
